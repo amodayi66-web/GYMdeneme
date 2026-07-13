@@ -1,0 +1,1039 @@
+// ============================================================================
+// GYM — Main Application
+// ============================================================================
+const STORE='gym-planner-v5';
+let state=JSON.parse(localStorage.getItem(STORE)||'{"workouts":[],"logs":[],"volumeGoal":0,"username":"","friends":[],"exerciseNotes":{},"bodyMeasurements":[],"rpeEnabled":true,"warmupEnabled":true}');
+let chan='BroadcastChannel'in window?new BroadcastChannel('gym-planner'):null;
+if(chan)chan.onmessage=e=>{state=e.data;save(false);render()};
+
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+const fmt=n=>new Intl.NumberFormat().format(n);
+const uid=()=>`${Date.now()}${Math.random().toString(16).slice(2)}`;
+const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));
+
+function save(send=true){
+  localStorage.setItem(STORE,JSON.stringify(state));
+  if(send&&chan)chan.postMessage(state);
+  updateSyncStatus();
+}
+
+function updateSyncStatus(){
+  const el=$('#sync-status');
+  if(!el)return;
+  if(GymSync.isConfigured()&&GymSync.isSignedIn()){
+    el.textContent=`Synced as ${GymSync.currentProfile().username}`;
+    el.parentElement.querySelector('i').style.background='var(--mint)';
+  } else if(GymSync.isConfigured()){
+    el.textContent='Cloud ready — pick a username';
+    el.parentElement.querySelector('i').style.background='var(--sun)';
+  } else {
+    el.textContent='Saved locally';
+    el.parentElement.querySelector('i').style.background='var(--mint)';
+  }
+}
+
+function head(title,sub){
+  return `<div class="eyebrow">TRAINING PLANNER</div><h1>${title}</h1>${sub?`<p class="intro">${sub}</p>`:''}`;
+}
+
+// ── Get next workout to start ──────────────────────────────────────────
+function getNextWorkout(){
+  if(!state.workouts.length)return null;
+  const completedIds=new Set(state.logs.map(l=>l.workout));
+  for(const w of state.workouts){
+    if(!completedIds.has(w.id))return w;
+  }
+  return state.workouts[0];
+}
+
+// ── Get similar exercises for swap (same muscle groups) ────────────────
+function getSimilarExercises(exerciseId){
+  const ex=byId(exerciseId);
+  if(!ex)return [];
+  const exMuscles=new Set(ex.muscles);
+  // Only suggest exercises with EXACTLY the same muscle groups
+  return EX.filter(e=>e.id!==ex.id&&
+    e.muscles.length===ex.muscles.length&&
+    e.muscles.every(m=>exMuscles.has(m))
+  ).slice(0,5);
+}
+
+// ── Get previous log data for an exercise (for prev column) ────────────
+function getPreviousSets(exerciseId){
+  // Find the most recent log that has this exercise
+  const logsWithEx=state.logs.filter(l=>l.sets&&l.sets[exerciseId]);
+  if(!logsWithEx.length)return null;
+  const last=logsWithEx[logsWithEx.length-1];
+  return {sets:last.sets[exerciseId],date:last.date,logId:last.id};
+}
+
+// ── Get exercise note ──────────────────────────────────────────────────
+function getExerciseNote(exerciseId){
+  return state.exerciseNotes?.[exerciseId]||'';
+}
+
+// ── Auto progression suggestion ────────────────────────────────────────
+function getAutoProgression(exerciseId,weight,reps){
+  const prev=GymAnalytics.getPreviousExerciseData(state.logs,exerciseId);
+  if(!prev||!prev.weight||!prev.reps)return null;
+  // If user hit >= target reps, suggest weight increase
+  const targetReps=prev.reps;
+  if(reps>=targetReps&&reps>=8){
+    const increase=Math.max(2.5,Math.round(prev.weight*0.05*2)/2);
+    return {suggestedWeight:prev.weight+increase,reason:`Hit ${reps} reps. Try +${increase} kg next time.`};
+  } else if(reps<targetReps&&reps>0){
+    return {suggestedWeight:prev.weight,suggestedReps:targetReps,reason:`Aim for ${targetReps} reps at ${prev.weight} kg first.`};
+  }
+  return null;
+}
+
+// ── HOME PAGE ──────────────────────────────────────────────────────────
+function home(){
+  const nextW=getNextWorkout();
+  return `<section class="hero">${head('A plan that fits you.','Choose a guided plan for your level or build a simple workout from the gym movements you enjoy.')}</section>
+  ${nextW?`<div style="border:var(--line);background:var(--sun);padding:18px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+    <div><div class="eyebrow">NEXT WORKOUT</div><h2 style="font-size:22px;letter-spacing:-1px;margin:4px 0 0">${esc(nextW.name)}</h2></div>
+    <a class="button" href="#/log/${nextW.id}">Start next workout →</a>
+  </div>`:''}
+  <section><div class="section-head"><div><div class="eyebrow">YOUR WORKOUTS</div><h2>My plan</h2></div><a class="button mint" href="#/templates">Choose a plan →</a></div>
+  ${state.workouts.length?`<div class="workout-grid">${state.workouts.map((w,i)=>`<a href="#/workout/${w.id}" class="workout-card"><small>${String(i+1).padStart(2,'0')} / ${w.exercises.length} exercises</small><h2>${esc(w.name)}</h2><p>${w.exercises.slice(0,3).map(id=>byId(id).name).join(' · ')}${w.exercises.length>3?' · …':''}</p><div class="card-foot"><span>OPEN WORKOUT</span><span>↗</span></div></a>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
+}
+
+// ── TEMPLATES PAGE ─────────────────────────────────────────────────────
+let level='All';
+let goalFilter='All';
+function templates(){
+  return `<section class="template-intro">${head('Find your starting point.','Choose the training style that matches your experience. Every plan creates editable workouts in your own planner.')}</section>
+  <div class="level-filter" id="level-filter">${['All','Beginner','Intermediate','Advanced'].map(x=>`<button class="filter ${level===x?'active':''}" data-level="${x}">${x}</button>`).join('')}</div>
+  <div class="level-filter" id="goal-filter">${['All',...getPlanGoals()].map(x=>`<button class="filter ${goalFilter===x?'active':''}" data-goal="${x}">${x}</button>`).join('')}</div>
+  <div id="template-grid" class="template-grid"></div>`;
+}
+
+function renderTemplates(){
+  let plans=PLANS.filter(p=>level==='All'||p.level===level).filter(p=>goalFilter==='All'||p.goal===goalFilter);
+  // Update filter active states
+  document.querySelectorAll('#level-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.level===level));
+  document.querySelectorAll('#goal-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.goal===goalFilter));
+  $('#template-grid').innerHTML=plans.map(p=>`<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${p.days.length} SESSION ROTATION</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(byName).map(id=>byId(id).name).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><button class="button" data-choose="${p.id}">Add this plan →</button></article>`).join('');
+}
+
+function addPlan(pid){
+  let p=PLANS.find(x=>x.id===pid);
+  p.days.forEach(d=>state.workouts.push({id:uid(),name:`${p.name} · ${d[0]}`,exercises:d[1].map(byName),source:p.name}));
+  save();location.hash='#/';
+}
+
+// ── BUILDER PAGE ───────────────────────────────────────────────────────
+let selected=[],category='All',muscleFilter='All',searchQuery='';
+
+function builder(){
+  return `<div class="builder-head"><div>${head('Build your own.','Name the workout, then add the exercises you want to train.')}</div><a href="#/" class="back">← My plan</a></div>
+  <div class="builder"><section class="builder-box">
+    <label class="label" for="workout-name">Workout name</label>
+    <input id="workout-name" class="text-input" maxlength="50" placeholder="e.g. Saturday upper body">
+    <input id="search-exercises" class="search-input" placeholder="Search exercises..." value="${esc(searchQuery)}">
+    <div class="eyebrow" style="margin-bottom:6px">Muscle group</div>
+    <div id="muscle-filters" class="filter-row compact"></div>
+    <div class="eyebrow" style="margin-bottom:6px">Equipment</div>
+    <div id="equip-filters" class="filter-row compact"></div>
+    <div id="exercise-list" class="exercise-list"></div>
+  </section><aside class="selection">
+    <div class="eyebrow">YOUR SELECTION</div>
+    <h2><span id="count">0</span> exercises</h2>
+    <ol id="selected-list" class="selected-list"><li>Choose exercises to begin.</li></ol>
+    <button id="save-workout" class="button">Save workout →</button>
+    <p id="message" class="message"></p>
+  </aside></div>`;
+}
+
+function renderBuilder(){
+  let choices=EX.filter(e=>{
+    if(searchQuery&&!e.name.toLowerCase().includes(searchQuery.toLowerCase()))return false;
+    if(muscleFilter!=='All'&&!e.muscles.includes(muscleFilter))return false;
+    if(category!=='All'&&e.category!==category)return false;
+    return true;
+  });
+  
+  const muscles=getMuscleGroups();
+  $('#muscle-filters').innerHTML=['All',...muscles].map(x=>`<button class="filter ${x===muscleFilter?'active':''}" data-muscle="${x}">${x}</button>`).join('');
+  
+  const equip=getEquipmentTypes();
+  $('#equip-filters').innerHTML=['All',...equip].map(x=>`<button class="filter ${x===category?'active':''}" data-category="${x}">${x}</button>`).join('');
+  
+  $('#exercise-list').innerHTML=choices.map(e=>`<button class="exercise-item ${selected.includes(e.id)?'selected':''}" data-exercise="${e.id}"><b>${e.name}</b><small>${e.category} · ${e.muscles.join(', ')}</small></button>`).join('');
+  
+  $('#count').textContent=selected.length;
+  $('#selected-list').innerHTML=selected.length?selected.map((x,i)=>`<li>${String(i+1).padStart(2,'0')} · ${byId(x).name}<button class="remove" data-remove="${x}">×</button></li>`).join(''):'<li>Choose exercises to begin.</li>';
+}
+
+// ── WORKOUT DETAIL PAGE ────────────────────────────────────────────────
+function workout(id){
+  let w=state.workouts.find(x=>x.id===id);
+  if(!w)return home();
+  return `<a class="back" href="#/">← My plan</a>
+  <div class="session-head"><div>${head(esc(w.name),`${w.exercises.length} movements. Keep the session simple and focused.`)}</div><a class="button" href="#/log/${w.id}">Start session →</a></div>
+  <div class="workout-grid">${w.exercises.map(x=>{let e=byId(x);return `<article class="workout-card"><small>${e.category.toUpperCase()}</small><h2>${e.name}</h2><p>${e.muscles.join(' · ')}</p><div class="card-foot"><span>WORKING MUSCLES</span></div></article>`}).join('')}</div>
+  <button style="margin-top:30px" class="button white" data-delete="${w.id}">Delete workout</button>`;
+}
+
+// ── LOG PAGE (Live Session) ────────────────────────────────────────────
+let workoutTimer=null;
+let restTimer=null;
+let restDuration=90;
+
+function setRow(n,prevReps='',prevWeight='',prevRpe='',isWarmup=false){
+  const prevStr=prevReps?`<small class="prev-data">${prevReps}×${prevWeight}${prevRpe?' @'+prevRpe:''}</small>`:'';
+  const rpeInput=state.rpeEnabled?`<input class="rpe" placeholder="RPE" inputmode="decimal" maxlength="3" style="width:40px">`:'';
+  return `<div class="set-row ${isWarmup?'warmup':''}"><span>${String(n).padStart(2,'0')}</span><input class="reps" placeholder="0" inputmode="numeric" value="${prevReps}"><input class="weight" placeholder="opt" inputmode="decimal" value="${prevWeight}"><span>kg</span>${rpeInput}${prevStr}</div>`;
+}
+
+function log(id){
+  let w=state.workouts.find(x=>x.id===id);
+  if(!w)return home();
+  
+  workoutTimer=GymTimers.createWorkoutTimer(t=>{
+    const el=$('#workout-timer');
+    if(el)el.textContent=t;
+  });
+  
+  return `<a class="back" href="#/workout/${id}">← ${esc(w.name)}</a>
+  <div class="session-head"><div>${head(esc(w.name),'Log the working sets that count.')}</div><span class="eyebrow">LIVE SESSION</span></div>
+  
+  <!-- Workout Timer -->
+  <div class="timer-section">
+    <div class="timer-label">WORKOUT DURATION</div>
+    <div class="timer-display" id="workout-timer">00:00</div>
+  </div>
+  
+  <!-- Warm-up toggle -->
+  <label class="toggle-label" style="display:inline-flex;align-items:center;gap:6px;font:10px 'DM Mono',monospace;cursor:pointer;margin-bottom:12px;padding:8px 12px;border:var(--line);background:var(--paper)"><input type="checkbox" id="toggle-warmup" ${state.warmupEnabled?'checked':''} style="width:16px;height:16px;cursor:pointer"> Warm-up sets</label>
+  
+  <!-- Rest Timer -->
+  <div class="timer-section" style="background:var(--lilac)">
+    <div class="timer-label">REST TIMER</div>
+    <div class="rest-options">
+      <button data-rest="30">30s</button>
+      <button data-rest="60">60s</button>
+      <button data-rest="90" class="active">90s</button>
+      <button data-rest="120">120s</button>
+      <button data-rest="150">150s</button>
+      <button data-rest="180">180s</button>
+      <input id="custom-rest" type="number" placeholder="Custom" inputmode="numeric" style="width:60px;border:2px solid var(--ink);padding:4px;font:10px 'DM Mono',monospace;text-align:center">
+    </div>
+    <div class="rest-status ready" id="rest-status">Ready</div>
+    <div class="timer-display" id="rest-timer" style="font-size:22px">01:30</div>
+  </div>
+  
+  <div class="log-layout"><section>${w.exercises.map(x=>{
+    let e=byId(x);
+    const prev=GymAnalytics.getPreviousExerciseData(state.logs,x);
+    const prevHtml=prev?`<div class="prev-best ${prev?'pr':''}">Best: ${prev.reps} reps × ${prev.weight} kg (${prev.date})</div>`:'';
+    const prevSets=getPreviousSets(x);
+    const prevSetsHtml=prevSets?`<div class="prev-sets-heading">LAST SESSION (${prevSets.date})</div><div class="prev-sets-grid">${prevSets.sets.map((s,i)=>`<span class="prev-set">Set ${i+1}: ${s.reps}×${s.weight} kg${s.rpe?' @'+s.rpe:''}</span>`).join('')}</div>`:'';
+    const note=getExerciseNote(x);
+    const noteHtml=note?`<div class="exercise-note">📝 ${esc(note)}</div>`:'';
+    const swapEx=getSimilarExercises(x);
+    const swapHtml=swapEx.length?`<div class="swap-section"><button class="swap-btn" data-swap="${x}">↔ Swap</button><div class="swap-options" id="swap-${x}" style="display:none">${swapEx.map(s=>`<button class="swap-option" data-swap-from="${x}" data-swap-to="${s.id}">${esc(s.name)}</button>`).join('')}</div></div>`:'';
+    const warmupSets=state.warmupEnabled?`<div class="warmup-section"><button class="toggle-warmup" data-exercise="${x}">+ Warm-up sets</button><div class="warmup-sets" id="warmup-${x}" style="display:none"></div></div>`:'';
+    const prevSetsData=getPreviousSets(x);
+    const row1=prevSetsData&&prevSetsData.sets[0]?setRow(1,prevSetsData.sets[0].reps,prevSetsData.sets[0].weight,prevSetsData.sets[0].rpe):setRow(1);
+    const row2=prevSetsData&&prevSetsData.sets[1]?setRow(2,prevSetsData.sets[1].reps,prevSetsData.sets[1].weight,prevSetsData.sets[1].rpe):setRow(2);
+    const row3=prevSetsData&&prevSetsData.sets[2]?setRow(3,prevSetsData.sets[2].reps,prevSetsData.sets[2].weight,prevSetsData.sets[2].rpe):setRow(3);
+    return `<article class="log-card" data-exercise="${x}"><div class="log-card-header"><h2>${e.name}</h2>${swapHtml}</div><small>${e.muscles.join(' · ')}</small>${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}<div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span>${state.rpeEnabled?'<span>RPE</span>':''}<span>Prev</span></div><div class="sets">${row1}${row2}${row3}</div><button class="add-set">+ add set</button></article>`;
+  }).join('')}</section><aside class="totals">
+    <div class="eyebrow">SESSION TOTAL</div>
+    <h2>Today’s work</h2>
+    <div class="total-row"><span>Working sets</span><b id="sets-total">0</b></div>
+    <div class="total-row"><span>Total reps</span><b id="reps-total">0</b></div>
+    <div class="total-row"><span>Volume</span><b id="volume-total">0 kg</b></div>
+    <div class="total-row"><span>Est. 1RM (best set)</span><b id="est-1rm">0 kg</b></div>
+    <div id="auto-progression" class="auto-progression"></div>
+    <button class="button" data-finish="${id}">Finish session →</button>
+  </aside></div>`;
+}
+
+function readLog(){
+  let r={};
+  document.querySelectorAll('.log-card').forEach(c=>{
+    const exId=c.dataset.exercise;
+    const sets=[...c.querySelectorAll('.set-row:not(.warmup)')].map(x=>({
+      reps:+x.querySelector('.reps').value||0,
+      weight:+x.querySelector('.weight').value||0,
+      rpe:x.querySelector('.rpe')?+x.querySelector('.rpe').value||0:0
+    })).filter(x=>x.reps);
+    // Also read warm-up sets
+    const warmup=[...c.querySelectorAll('.set-row.warmup')].map(x=>({
+      reps:+x.querySelector('.reps').value||0,
+      weight:+x.querySelector('.weight').value||0,
+      rpe:x.querySelector('.rpe')?+x.querySelector('.rpe').value||0:0,
+      warmup:true
+    })).filter(x=>x.reps);
+    r[exId]=[...warmup,...sets];
+  });
+  return r;
+}
+
+function updateTotals(){
+  let s=Object.values(readLog()).flat().filter(x=>!x.warmup);
+  let r=s.reduce((a,x)=>a+x.reps,0);
+  let v=s.reduce((a,x)=>a+x.reps*x.weight,0);
+  $('#sets-total').textContent=s.length;
+  $('#reps-total').textContent=fmt(r);
+  $('#volume-total').textContent=`${fmt(v)} kg`;
+  
+  let bestSet=s.reduce((a,x)=>(x.reps*x.weight)>(a.reps*a.weight)?x:a,{reps:0,weight:0});
+  let est1RM=GymAnalytics.estimate1RM(bestSet.reps,bestSet.weight);
+  $('#est-1rm').textContent=est1RM?`${fmt(est1RM)} kg`:'0 kg';
+  
+  updateGoalProgress(v);
+  
+  // Auto progression
+  updateAutoProgression();
+}
+
+function updateAutoProgression(){
+  const el=$('#auto-progression');
+  if(!el)return;
+  const data=readLog();
+  let suggestions=[];
+  Object.entries(data).forEach(([exId,sets])=>{
+    const workingSets=sets.filter(s=>!s.warmup&&s.reps>0);
+    if(!workingSets.length)return;
+    const bestSet=workingSets.reduce((a,b)=>(b.reps*b.weight)>(a.reps*a.weight)?b:a);
+    const prog=getAutoProgression(exId,bestSet.weight,bestSet.reps);
+    if(prog){
+      const ex=byId(exId);
+      suggestions.push(`<div class="prog-item"><b>${ex?ex.name:'Unknown'}</b>: ${prog.reason}</div>`);
+    }
+  });
+  el.innerHTML=suggestions.length?`<div class="prog-head">💡 NEXT SESSION SUGGESTIONS</div>${suggestions.join('')}`:'';
+}
+
+function updateGoalProgress(currentVolume){
+  const goal=state.volumeGoal||0;
+  const el=$('#goal-fill');
+  const txt=$('#goal-text');
+  if(!el||!txt)return;
+  if(goal>0){
+    const pct=Math.min(100,(currentVolume/goal)*100);
+    el.style.width=pct+'%';
+    txt.textContent=`${fmt(currentVolume)} / ${fmt(goal)} kg (${Math.round(pct)}%)`;
+  } else {
+    el.style.width='0%';
+    txt.textContent=`${fmt(currentVolume)} / — kg`;
+  }
+}
+
+// ── SUMMARY PAGE ───────────────────────────────────────────────────────
+function summary(id){
+  let l=state.logs.find(x=>x.id===id);
+  let w=state.workouts.find(x=>x.id===l?.workout);
+  if(!l)return home();
+  let s=Object.values(l.sets).flat().filter(x=>!x.warmup);
+  let r=s.reduce((a,x)=>a+x.reps,0);
+  let v=s.reduce((a,x)=>a+x.reps*x.weight,0);
+  const durationStr=l.duration?` · ${l.duration}`:'';
+  return `<a class="back" href="#/">← My plan</a>
+  <section class="summary"><div class="eyebrow">SESSION COMPLETE / ${l.date}${durationStr}</div>
+  <h1>Work done.</h1><p class="intro">${esc(w?.name||'Workout')} has been saved to this device.</p>
+  <div class="summary-stats"><div><b>${fmt(r)}</b><span>TOTAL REPS</span></div><div><b>${fmt(v)} kg</b><span>VOLUME</span></div><div><b>${s.length}</b><span>WORKING SETS</span></div></div>
+  ${Object.entries(l.sets).map(([x,a])=>{
+    const ex=byId(x);
+    const working=a.filter(s=>!s.warmup);
+    if(!working.length)return '';
+    const exVol=working.reduce((z,q)=>z+q.reps*q.weight,0);
+    const exReps=working.reduce((z,q)=>z+q.reps,0);
+    const prev=GymAnalytics.getPreviousExerciseData(state.logs.filter(l2=>l2.id!==id),x);
+    let overload='';
+    if(prev){
+      const diff=exVol-prev.volume;
+      if(diff>0)overload='<span class="overload-indicator up">↑ +'+fmt(diff)+' kg</span>';
+      else if(diff<0)overload='<span class="overload-indicator down">↓ '+fmt(diff)+' kg</span>';
+      else overload='<span class="overload-indicator equal">— same</span>';
+    }
+    const warmupCount=a.filter(s=>s.warmup).length;
+    const warmupStr=warmupCount?` <span style="color:#999;font-size:10px">(+${warmupCount} warm-up)</span>`:'';
+    return `<div class="break-row"><b>${ex?ex.name:'Unknown'}${overload}</b><span>${working.length} sets · ${exReps} reps · ${fmt(exVol)} kg${warmupStr}</span></div>`;
+  }).join('')}
+  <a class="button white" style="margin-top:24px" href="#/">Back to my plan</a></section>`;
+}
+
+// ── PROGRESS PAGE ──────────────────────────────────────────────────────
+let progressTab='overview';
+function progress(){
+  return `<div class="progress-head">${head('Your progress.','Track your volume, records, and weekly trends.')}</div>
+  <div class="progress-tabs">
+    <button class="progress-tab ${progressTab==='overview'?'active':''}" data-tab="overview">Overview</button>
+    <button class="progress-tab ${progressTab==='weekly'?'active':''}" data-tab="weekly">Weekly Report</button>
+    <button class="progress-tab ${progressTab==='measurements'?'active':''}" data-tab="measurements">Body Stats</button>
+    <button class="progress-tab ${progressTab==='graphs'?'active':''}" data-tab="graphs">Graphs</button>
+  </div>
+  <div id="progress-content">${progressTab==='overview'?progressOverview():progressTab==='weekly'?progressWeekly():progressTab==='measurements'?progressMeasurements():progressGraphs()}</div>`;
+}
+
+function progressOverview(){
+  const logs=state.logs;
+  const muscleStats=GymAnalytics.getMuscleGroupStats(logs);
+  const prs=GymAnalytics.getPersonalRecords(logs);
+  const weekly=GymAnalytics.getWeeklyStats(logs);
+  const best1RM=GymAnalytics.getBestEstimated1RM(logs);
+  const streak=GymAnalytics.getStreak(logs);
+  const totalVolume=Object.values(muscleStats).reduce((a,b)=>a+b,0);
+  const totalSessions=logs.length;
+  
+  return `<div class="streak-badge"><span>🔥</span> ${streak} week streak</div>
+  <div class="progress-grid">
+    <div class="progress-card"><h3>Overview</h3>
+      <div class="stat"><span>Total sessions</span><b>${totalSessions}</b></div>
+      <div class="stat"><span>Total volume</span><b>${fmt(totalVolume)} kg</b></div>
+      <div class="stat"><span>Total sets logged</span><b>${logs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0)}</b></div>
+      <div class="stat"><span>Exercises in library</span><b>${EX.length}</b></div>
+    </div>
+    <div class="progress-card"><h3>Volume by Muscle Group</h3>
+      ${Object.entries(muscleStats).slice(0,10).map(([muscle,vol])=>{
+        const pct=totalVolume?Math.round((vol/totalVolume)*100):0;
+        return `<div class="volume-bar"><span style="font:10px 'DM Mono',monospace;min-width:60px">${muscle}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <span class="bar-label">${fmt(vol)} kg</span></div>`;
+      }).join('')}
+      ${Object.keys(muscleStats).length===0?'<p style="color:#999;font-size:12px">Complete a session to see muscle stats.</p>':''}
+    </div>
+    <div class="progress-card"><h3>Personal Records (Best Volume)</h3>
+      ${prs.length?`<ul class="pr-list">${prs.slice(0,8).map(p=>`<li><span>${esc(p.exerciseName)}</span><b>${fmt(p.reps)} reps × ${fmt(p.weight)} kg <small>${p.date}</small></b></li>`).join('')}</ul>`:'<p style="color:#999;font-size:12px">Complete a session to see PRs.</p>'}
+      ${prs.length>8?`<a class="button small white" style="margin-top:8px" id="show-all-prs">Show all (${prs.length})</a>`:''}
+    </div>
+    <div class="progress-card"><h3>Estimated 1RM</h3>
+      ${best1RM.length?`<ul class="pr-list">${best1RM.slice(0,8).map(p=>`<li><span>${esc(p.exerciseName)}</span><b>${fmt(p.estimated1RM)} kg <small>${p.reps}×${p.weight}</small></b></li>`).join('')}</ul>`:'<p style="color:#999;font-size:12px">Log sets with weight to estimate 1RM.</p>'}
+    </div>
+    <div class="progress-card" style="grid-column:1/-1"><h3>Weekly Performance</h3>
+      ${weekly.length?`<ul class="history-list">${weekly.slice(-8).reverse().map(w=>`<li><span class="date">Week of ${w.weekStart}</span><span class="vol">${fmt(w.volume)} kg</span><span class="sets-count">${w.sets} sets · ${w.count} sessions</span></li>`).join('')}</ul>`:'<p style="color:#999;font-size:12px">Complete sessions to see weekly stats.</p>'}
+    </div>
+    <div class="progress-card" style="grid-column:1/-1"><h3>Session History</h3>
+      ${logs.length?`<ul class="history-list">${logs.slice().reverse().map(l=>{
+        const w=state.workouts.find(x=>x.id===l.workout);
+        const vol=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((a,s)=>a+s.reps*s.weight,0);
+        const sets=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length;
+        return `<li><span class="date">${l.date}${l.duration?' · '+l.duration:''}</span><span class="vol">${fmt(vol)} kg</span><span class="sets-count">${sets} sets</span></li>`;
+      }).join('')}</ul>`:'<p style="color:#999;font-size:12px">No sessions logged yet.</p>'}
+    </div>
+  </div>`;
+}
+
+function progressWeekly(){
+  const logs=state.logs;
+  const weekly=GymAnalytics.getWeeklyStats(logs);
+  if(!weekly.length)return '<div class="empty"><h2>No sessions logged yet.</h2><p>Complete a workout to see your weekly report.</p></div>';
+  
+  const latest=weekly[weekly.length-1];
+  const prev=weekly.length>1?weekly[weekly.length-2]:null;
+  const volChange=prev?((latest.volume-prev.volume)/prev.volume*100).toFixed(1):null;
+  
+  // Get daily breakdown for latest week
+  const weekStart=latest.weekStart;
+  const weekEnd=new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate()+6);
+  const weekEndStr=weekEnd.toISOString().slice(0,10);
+  
+  const weekLogs=logs.filter(l=>{
+    const d=new Date(l.date);
+    if(isNaN(d.getTime()))return false;
+    const day=d.getDay();
+    const diff=d.getDate()-day+(day===0?-6:1);
+    const monday=new Date(d.setDate(diff)).toISOString().slice(0,10);
+    return monday===weekStart;
+  });
+  
+  const muscleStats=GymAnalytics.getMuscleGroupStats(weekLogs);
+  const totalVolume=Object.values(muscleStats).reduce((a,b)=>a+b,0);
+  
+  return `<div class="weekly-report">
+    <div class="report-header">
+      <h2>📊 ${weekStart} — ${weekEndStr}</h2>
+      ${volChange!==null?`<div class="vol-change ${volChange>=0?'up':'down'}">${volChange>=0?'↑':'↓'} ${Math.abs(volChange)}% vs last week</div>`:''}
+    </div>
+    <div class="report-stats">
+      <div class="report-stat"><b>${latest.count}</b><span>Sessions</span></div>
+      <div class="report-stat"><b>${fmt(latest.volume)} kg</b><span>Volume</span></div>
+      <div class="report-stat"><b>${fmt(latest.reps)}</b><span>Reps</span></div>
+      <div class="report-stat"><b>${latest.sets}</b><span>Sets</span></div>
+    </div>
+    
+    <h3 style="margin:20px 0 10px;font-size:18px">Volume by Muscle Group</h3>
+    <div class="weekly-muscle-chart">
+      ${Object.entries(muscleStats).sort((a,b)=>b[1]-a[1]).map(([muscle,vol])=>{
+        const pct=totalVolume?Math.round((vol/totalVolume)*100):0;
+        return `<div class="volume-bar"><span style="font:10px 'DM Mono',monospace;min-width:60px">${muscle}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <span class="bar-label">${fmt(vol)} kg (${pct}%)</span></div>`;
+      }).join('')}
+    </div>
+    
+    <h3 style="margin:20px 0 10px;font-size:18px">Daily Breakdown</h3>
+    <div class="daily-breakdown">
+      ${weekLogs.length?weekLogs.map(l=>{
+        const w=state.workouts.find(x=>x.id===l.workout);
+        const vol=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((a,s)=>a+s.reps*s.weight,0);
+        const sets=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length;
+        return `<div class="daily-card">
+          <div class="daily-date">${l.date}</div>
+          <div class="daily-name">${esc(w?.name||'Workout')}</div>
+          <div class="daily-stats"><span>${fmt(vol)} kg</span><span>${sets} sets</span>${l.duration?`<span>${l.duration}</span>`:''}</div>
+        </div>`;
+      }).join(''):'<p style="color:#999">No sessions this week.</p>'}
+    </div>
+  </div>`;
+}
+
+function progressMeasurements(){
+  const measurements=state.bodyMeasurements||[];
+  const latest=measurements.length?measurements[measurements.length-1]:null;
+  const prev=measurements.length>1?measurements[measurements.length-2]:null;
+  
+  return `<div class="measurements-section">
+    <div class="measurements-head">
+      <h2>Body Measurements</h2>
+      <p style="color:#666;font-size:12px">Track your body stats over time.</p>
+    </div>
+    
+    ${latest?`<div class="latest-measurements">
+      <h3>Latest (${latest.date})</h3>
+      <div class="measure-grid">
+        ${latest.weight?`<div class="measure-card"><span class="measure-label">Weight</span><span class="measure-value">${latest.weight} kg</span>${prev&&prev.weight?`<span class="measure-diff ${latest.weight>=prev.weight?'up':'down'}">${latest.weight>=prev.weight?'+':''}${(latest.weight-prev.weight).toFixed(1)}</span>`:''}</div>`:''}
+        ${latest.bodyFat?`<div class="measure-card"><span class="measure-label">Body Fat</span><span class="measure-value">${latest.bodyFat}%</span>${prev&&prev.bodyFat?`<span class="measure-diff ${latest.bodyFat<=prev.bodyFat?'down':'up'}">${latest.bodyFat<=prev.bodyFat?'-':'+'}${Math.abs(latest.bodyFat-prev.bodyFat).toFixed(1)}</span>`:''}</div>`:''}
+        ${latest.waist?`<div class="measure-card"><span class="measure-label">Waist</span><span class="measure-value">${latest.waist} cm</span></div>`:''}
+        ${latest.chest?`<div class="measure-card"><span class="measure-label">Chest</span><span class="measure-value">${latest.chest} cm</span></div>`:''}
+        ${latest.arms?`<div class="measure-card"><span class="measure-label">Arms</span><span class="measure-value">${latest.arms} cm</span></div>`:''}
+        ${latest.thighs?`<div class="measure-card"><span class="measure-label">Thighs</span><span class="measure-value">${latest.thighs} cm</span></div>`:''}
+      </div>
+    </div>`:`<div class="empty"><h2>No measurements yet.</h2><p>Start tracking your body stats below.</p></div>`}
+    
+    <div class="add-measurements">
+      <h3>Add Measurement</h3>
+      <div class="measure-form">
+        <div class="measure-field"><label>Weight (kg)</label><input id="m-weight" type="number" step="0.1" placeholder="75"></div>
+        <div class="measure-field"><label>Body Fat %</label><input id="m-bodyfat" type="number" step="0.1" placeholder="15"></div>
+        <div class="measure-field"><label>Waist (cm)</label><input id="m-waist" type="number" step="0.5" placeholder="80"></div>
+        <div class="measure-field"><label>Chest (cm)</label><input id="m-chest" type="number" step="0.5" placeholder="100"></div>
+        <div class="measure-field"><label>Arms (cm)</label><input id="m-arms" type="number" step="0.5" placeholder="35"></div>
+        <div class="measure-field"><label>Thighs (cm)</label><input id="m-thighs" type="number" step="0.5" placeholder="55"></div>
+      </div>
+      <button class="button" id="save-measurements">Save measurements →</button>
+      <p id="measure-msg" class="message"></p>
+    </div>
+    
+    ${measurements.length>1?`<div class="measurement-history">
+      <h3>History</h3>
+      <ul class="history-list">${measurements.slice().reverse().map(m=>{
+        const vals=[m.weight?m.weight+' kg':'',m.bodyFat?m.bodyFat+'%':'',m.waist?m.waist+'cm':''].filter(Boolean).join(' · ');
+        return `<li><span class="date">${m.date}</span><span class="vol">${vals||'—'}</span></li>`;
+      }).join('')}</ul>
+    </div>`:''}
+  </div>`;
+}
+
+function progressGraphs(){
+  const logs=state.logs;
+  const weekly=GymAnalytics.getWeeklyStats(logs);
+  
+  if(!weekly.length)return '<div class="empty"><h2>No data to chart yet.</h2><p>Complete a few workouts to see your trends.</p></div>';
+  
+  // Build a simple bar chart for weekly volume
+  const maxVol=Math.max(...weekly.map(w=>w.volume));
+  const chartHeight=200;
+  
+  return `<div class="graphs-section">
+    <h2>Volume Over Time</h2>
+    <div class="bar-chart" style="height:${chartHeight}px">
+      ${weekly.slice(-12).map(w=>{
+        const pct=w.volume/maxVol;
+        const height=Math.max(4,pct*chartHeight);
+        return `<div class="bar-chart-col" title="Week of ${w.weekStart}: ${fmt(w.volume)} kg">
+          <div class="bar-chart-bar" style="height:${height}px"></div>
+          <span class="bar-chart-label">${w.weekStart.slice(5)}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    
+    <h2 style="margin-top:30px">Weekly Sessions</h2>
+    <div class="bar-chart" style="height:${chartHeight}px">
+      ${weekly.slice(-12).map(w=>{
+        const pct=w.count/Math.max(...weekly.map(x=>x.count));
+        const height=Math.max(4,pct*chartHeight);
+        return `<div class="bar-chart-col" title="Week of ${w.weekStart}: ${w.count} sessions">
+          <div class="bar-chart-bar" style="height:${height}px;background:var(--lilac)"></div>
+          <span class="bar-chart-label">${w.weekStart.slice(5)}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    
+    <h2 style="margin-top:30px">Volume by Muscle Group (All Time)</h2>
+    <div class="muscle-pie" id="muscle-pie"></div>
+    ${renderMusclePie()}
+  </div>`;
+}
+
+function renderMusclePie(){
+  const muscleStats=GymAnalytics.getMuscleGroupStats(state.logs);
+  const totalVolume=Object.values(muscleStats).reduce((a,b)=>a+b,0);
+  if(!totalVolume)return '';
+  const colors=['#fd6b43','#f8dc65','#bcebcf','#ddd7ff','#ffb3b3','#b3d9ff','#d4edda','#ffeeba','#c3e6cb','#f5c6cb'];
+  const entries=Object.entries(muscleStats).sort((a,b)=>b[1]-a[1]);
+  return `<div class="pie-chart">
+    ${entries.slice(0,8).map(([muscle,vol],i)=>{
+      const pct=((vol/totalVolume)*100).toFixed(1);
+      return `<div class="pie-row"><span class="pie-dot" style="background:${colors[i%colors.length]}"></span><span class="pie-label">${muscle}</span><span class="pie-bar"><div class="pie-bar-fill" style="width:${pct}%;background:${colors[i%colors.length]}"></div></span><span class="pie-pct">${pct}%</span></div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ── SOCIAL PAGE ────────────────────────────────────────────────────────
+let socialSearch='';
+function social(){
+  const profile=GymSync.currentProfile();
+  const isSignedIn=GymSync.isSignedIn();
+  const isConfigured=GymSync.isConfigured();
+  
+  return `<div class="social-head">${head('Social.','See what others are training. Search for a username to view their workouts.')}</div>
+  
+  ${!isConfigured?`<div class="social-empty"><h3>Cloud sync not configured</h3><p>Set up Firebase to use social features.</p></div>`:
+  !isSignedIn?`<div class="social-empty"><h3>Choose a username to get started</h3>
+    <div style="display:flex;gap:8px;margin-top:12px;justify-content:center">
+      <input id="username-input" class="text-input" style="max-width:250px" placeholder="Your username..." maxlength="20">
+      <button class="button" id="claim-username">Claim →</button>
+    </div>
+    <p id="username-msg" style="font:10px 'DM Mono',monospace;margin-top:8px"></p>
+  </div>`:
+  `<div class="social-profile"><h2>${esc(profile.username)}</h2>
+    <div class="stats"><span><b>${state.logs.length}</b> sessions</span><span><b>${state.workouts.length}</b> workouts</span></div>
+    <button class="button white small" id="sign-out" style="margin-top:10px">Sign out</button>
+  </div>`}
+  
+  ${isSignedIn?`<div class="social-search">
+    <input id="social-search-input" placeholder="Search username..." value="${esc(socialSearch)}">
+    <button class="button" id="social-search-btn">Search</button>
+  </div>
+  <div id="social-results"></div>`:''}`;
+}
+
+async function searchUser(username){
+  const results=$('#social-results');
+  if(!results)return;
+  results.innerHTML='<p style="color:#999">Searching...</p>';
+  
+  try {
+    const friends=await GymSync.friendsFeed();
+    const userData=friends.find(f=>f.username.toLowerCase()===username.toLowerCase());
+    
+    if(userData&&userData.logs&&userData.logs.length){
+      const logs=userData.logs;
+      const totalVol=logs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((s,set)=>s+set.reps*set.weight,0),0);
+      const totalSets=logs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0);
+      
+      results.innerHTML=`<div class="social-profile"><h2>${esc(userData.username)}</h2>
+        <div class="stats"><span><b>${logs.length}</b> sessions</span><span><b>${fmt(totalVol)} kg</b> total volume</span><span><b>${totalSets}</b> sets</span></div></div>
+        <h3 style="font-size:16px;margin:16px 0 10px">Recent Workouts</h3>
+        ${logs.slice().reverse().slice(0,10).map(l=>{
+          const wName=userData.workouts?.find(w=>w.id===l.workout)?.name||'Workout';
+          const vol=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((a,s)=>a+s.reps*s.weight,0);
+          const sets=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length;
+          return `<div class="social-workout"><h3>${esc(wName)}</h3>
+            <div class="meta">${l.date} · ${sets} sets · ${fmt(vol)} kg</div>
+            <div class="ex-list">${Object.entries(l.sets||{}).map(([exId,sets])=>{
+              const ex=byId(exId);
+              return ex?`<span>${esc(ex.name)} (${sets.length} sets)</span>`:'';
+            }).join('')}</div></div>`;
+        }).join('')}`;
+    } else {
+      results.innerHTML=`<div class="social-empty"><h3>No results for "${esc(username)}"</h3><p>This user hasn't synced any workouts yet, or the username doesn't exist.</p></div>`;
+    }
+  } catch(e){
+    results.innerHTML=`<div class="social-error">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── ROUTER ─────────────────────────────────────────────────────────────
+function render(){
+  let p=location.hash.slice(2).split('/'),r=p[0]||'';
+  
+  if(r!=='log'&&workoutTimer){workoutTimer.stop();workoutTimer=null;}
+  if(r!=='log'&&restTimer){restTimer.stop();restTimer=null;}
+  
+  switch(r){
+    case 'templates': $('#app').innerHTML=templates(); renderTemplates(); break;
+    case 'builder': $('#app').innerHTML=builder(); renderBuilder(); break;
+    case 'workout': $('#app').innerHTML=workout(p[1]); break;
+    case 'log': $('#app').innerHTML=log(p[1]); setTimeout(initLog,50); break;
+    case 'summary': $('#app').innerHTML=summary(p[1]); break;
+    case 'progress': $('#app').innerHTML=progress(); setTimeout(initProgress,50); break;
+    case 'social': $('#app').innerHTML=social(); setTimeout(initSocial,50); break;
+    default: $('#app').innerHTML=home(); break;
+  }
+  
+  document.querySelectorAll('.topbar nav a').forEach(a=>a.classList.toggle('active',a.hash===location.hash||(a.hash==='#/'&&!location.hash)));
+  
+  bind();
+}
+
+function bind(){
+  // ── Templates ──
+  if(location.hash==='#/templates'){
+    $('#level-filter').onclick=e=>{
+      if(e.target.dataset.level){level=e.target.dataset.level;renderTemplates();}
+    };
+    $('#goal-filter').onclick=e=>{
+      if(e.target.dataset.goal){goalFilter=e.target.dataset.goal;renderTemplates();}
+    };
+    $('#template-grid').onclick=e=>{
+      if(e.target.dataset.choose)addPlan(e.target.dataset.choose);
+    };
+  }
+  
+  // ── Builder ──
+  if(location.hash==='#/builder'){
+    $('#search-exercises').oninput=e=>{
+      searchQuery=e.target.value;
+      renderBuilder();
+    };
+    $('#muscle-filters').onclick=e=>{
+      if(e.target.dataset.muscle){muscleFilter=e.target.dataset.muscle;renderBuilder();}
+    };
+    $('#equip-filters').onclick=e=>{
+      if(e.target.dataset.category){category=e.target.dataset.category;renderBuilder();}
+    };
+    $('#exercise-list').onclick=e=>{
+      let b=e.target.closest('[data-exercise]');
+      if(!b)return;
+      let x=b.dataset.exercise;
+      selected=selected.includes(x)?selected.filter(q=>q!==x):[...selected,x];
+      renderBuilder();
+    };
+    $('#selected-list').onclick=e=>{
+      if(e.target.dataset.remove){selected=selected.filter(x=>x!==e.target.dataset.remove);renderBuilder();}
+    };
+    $('#save-workout').onclick=()=>{
+      let n=$('#workout-name').value.trim(),m=$('#message');
+      if(!n)return m.textContent='Give your workout a name.';
+      if(!selected.length)return m.textContent='Choose at least one exercise.';
+      let w={id:uid(),name:n,exercises:selected};
+      state.workouts.push(w);save();selected=[];location.hash=`#/workout/${w.id}`;
+    };
+  }
+  
+  // ── Delete workout ──
+  document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{
+    state.workouts=state.workouts.filter(x=>x.id!==b.dataset.delete);save();location.hash='#/';
+  });
+  
+  // ── Progress show all PRs ──
+  const showPrs=$('#show-all-prs');
+  if(showPrs)showPrs.onclick=()=>{
+    const prs=GymAnalytics.getPersonalRecords(state.logs);
+    const card=showPrs.closest('.progress-card');
+    const list=card.querySelector('.pr-list');
+    if(list){
+      list.innerHTML=prs.map(p=>`<li><span>${esc(p.exerciseName)}</span><b>${fmt(p.reps)} reps × ${fmt(p.weight)} kg <small>${p.date}</small></b></li>`).join('');
+      showPrs.remove();
+    }
+  };
+}
+
+function initProgress(){
+  // ── Progress tabs ──
+  document.querySelectorAll('.progress-tab').forEach(t=>t.onclick=()=>{
+    progressTab=t.dataset.tab;
+    render();
+  });
+  
+  // ── Save measurements ──
+  const saveMeas=$('#save-measurements');
+  if(saveMeas)saveMeas.onclick=()=>{
+    const weight=$('#m-weight')?.value;
+    const bodyFat=$('#m-bodyfat')?.value;
+    const waist=$('#m-waist')?.value;
+    const chest=$('#m-chest')?.value;
+    const arms=$('#m-arms')?.value;
+    const thighs=$('#m-thighs')?.value;
+    const msg=$('#measure-msg');
+    if(!weight&&!bodyFat&&!waist&&!chest&&!arms&&!thighs){
+      return msg.textContent='Fill at least one field.';
+    }
+    if(!state.bodyMeasurements)state.bodyMeasurements=[];
+    state.bodyMeasurements.push({
+      date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+      weight:weight?+weight:null,
+      bodyFat:bodyFat?+bodyFat:null,
+      waist:waist?+waist:null,
+      chest:chest?+chest:null,
+      arms:arms?+arms:null,
+      thighs:thighs?+thighs:null
+    });
+    save();
+    msg.textContent='Saved!';
+    setTimeout(()=>render(),500);
+  };
+}
+
+function initLog(){
+  // ── Add set ──
+  document.querySelectorAll('.add-set').forEach(b=>b.onclick=()=>{
+    let l=b.previousElementSibling;
+    const setNum=l.querySelectorAll('.set-row').length+1;
+    l.insertAdjacentHTML('beforeend',setRow(setNum));
+    updateTotals();
+  });
+  
+  // ── Live totals ──
+  document.querySelectorAll('.log-card').forEach(x=>x.oninput=updateTotals);
+  
+  // ── Auto-start rest timer when reps filled, restart on every new entry ──
+  document.querySelectorAll('.set-row .reps').forEach(inp=>inp.oninput=function(){
+    if(this.value&&this.value>0){
+      // Always restart the rest timer on any rep input
+      if(restTimer){
+        restTimer.reset();
+        restTimer.setDuration(restDuration);
+        restTimer.start();
+        updateRestUI();
+      }
+    }
+  });
+  
+  // ── Rest timer options ──
+  document.querySelectorAll('[data-rest]').forEach(b=>b.onclick=function(){
+    restDuration=+this.dataset.rest;
+    document.querySelectorAll('[data-rest]').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+    if(restTimer){
+      restTimer.setDuration(restDuration);
+      restTimer.reset();
+      updateRestUI();
+    }
+  });
+  
+  function updateRestUI(){
+    const el=$('#rest-timer');
+    const status=$('#rest-status');
+    if(!el||!status)return;
+    if(restTimer&&restTimer.isActive()){
+      status.textContent='Resting...';
+      status.className='rest-status resting';
+    } else {
+      status.textContent='Ready';
+      status.className='rest-status ready';
+    }
+  }
+  
+  // ── Initialize rest timer ──
+  restTimer=GymTimers.createRestTimer(
+    (display,remaining)=>{
+      const el=$('#rest-timer');
+      const status=$('#rest-status');
+      if(el)el.textContent=display;
+      if(status){
+        if(remaining>0)status.textContent='Resting...';
+        else if(remaining===0)status.textContent='GO!';
+        else status.textContent='Ready';
+      }
+    },
+    ()=>{
+      const status=$('#rest-status');
+      if(status)status.textContent='Ready';
+    }
+  );
+  restTimer.setDuration(restDuration);
+  restTimer.reset();
+  
+  // ── Start workout timer ──
+  if(workoutTimer)workoutTimer.start();
+  
+  // ── Custom rest timer ──
+  const customRest=$('#custom-rest');
+  if(customRest)customRest.onchange=function(){
+    const val=+this.value;
+    if(val>0){
+      restDuration=val;
+      document.querySelectorAll('[data-rest]').forEach(x=>x.classList.remove('active'));
+      if(restTimer){
+        restTimer.setDuration(restDuration);
+        restTimer.reset();
+        updateRestUI();
+      }
+    }
+  };
+  
+  // ── Toggle warm-up ──
+  const toggleWarmup=$('#toggle-warmup');
+  if(toggleWarmup)toggleWarmup.onchange=()=>{
+    state.warmupEnabled=toggleWarmup.checked;
+    save(false);
+    const id=location.hash.split('/')[2];
+    if(id)render();
+  };
+  
+  // ── Warm-up sets toggle ──
+  document.querySelectorAll('.toggle-warmup').forEach(b=>b.onclick=function(){
+    const exId=this.dataset.exercise;
+    const container=$(`#warmup-${exId}`);
+    if(!container)return;
+    if(container.style.display!=='none'){
+      container.style.display='none';
+      this.textContent='+ Warm-up sets';
+      return;
+    }
+    container.style.display='block';
+    this.textContent='− Warm-up sets';
+    // Get previous warm-up data if available
+    const prev=getPreviousSets(exId);
+    const prevWarmup=prev?prev.sets.filter(s=>s.warmup):[];
+    // Add 3 warm-up rows with increasing weight
+    const mainSet=document.querySelector(`[data-exercise="${exId}"] .set-row:not(.warmup) .weight`);
+    const mainWeight=mainSet?+mainSet.value||0:0;
+    let html='';
+    for(let i=1;i<=3;i++){
+      const warmWeight=mainWeight?Math.round((mainWeight*(0.4+i*0.15))/2.5)*2.5:0;
+      const prevW=prevWarmup[i-1];
+      html+=setRow(i,prevW?prevW.reps:'',warmWeight||prevW?.weight||'',prevW?.rpe||'',true);
+    }
+    container.innerHTML=html;
+    updateTotals();
+  });
+  
+  // ── Swap exercise ──
+  document.querySelectorAll('.swap-btn').forEach(b=>b.onclick=function(){
+    const swapOptions=this.nextElementSibling;
+    if(swapOptions)swapOptions.style.display=swapOptions.style.display==='none'?'block':'none';
+  });
+  
+  document.querySelectorAll('.swap-option').forEach(b=>b.onclick=function(){
+    const from=this.dataset.swapFrom;
+    const to=this.dataset.swapTo;
+    // Find the workout and replace the exercise
+    const id=location.hash.split('/')[2];
+    const w=state.workouts.find(x=>x.id===id);
+    if(w){
+      const idx=w.exercises.indexOf(from);
+      if(idx!==-1){
+        w.exercises[idx]=to;
+        save();
+        render();
+      }
+    }
+  });
+  
+  // ── Exercise notes ──
+  // Add a note input to each log card header
+  document.querySelectorAll('.log-card').forEach(card=>{
+    const exId=card.dataset.exercise;
+    const header=card.querySelector('.log-card-header');
+    if(header&&exId){
+      const note=getExerciseNote(exId);
+      const noteBtn=document.createElement('button');
+      noteBtn.className='note-btn';
+      noteBtn.textContent='📝';
+      noteBtn.title=note||'Add note';
+      noteBtn.style.cssText='border:0;background:none;font-size:16px;cursor:pointer;margin-left:auto';
+      header.appendChild(noteBtn);
+      
+      // Note input popup
+      const noteInput=document.createElement('div');
+      noteInput.className='note-input-popup';
+      noteInput.style.cssText='display:none;position:absolute;background:#fff;border:2px solid var(--ink);padding:10px;z-index:100;margin-top:4px;right:0';
+      noteInput.innerHTML=`<textarea id="note-${exId}" rows="3" style="width:200px;border:2px solid var(--ink);padding:6px;font-size:12px">${esc(note)}</textarea><button class="button small" data-save-note="${exId}" style="margin-top:4px">Save</button>`;
+      noteBtn.parentElement.style.position='relative';
+      noteBtn.parentElement.appendChild(noteInput);
+      
+      noteBtn.onclick=()=>{
+        noteInput.style.display=noteInput.style.display==='none'?'block':'none';
+      };
+      
+      noteInput.querySelector('[data-save-note]').onclick=()=>{
+        const val=document.getElementById(`note-${exId}`)?.value||'';
+        if(!state.exerciseNotes)state.exerciseNotes={};
+        state.exerciseNotes[exId]=val;
+        save();
+        noteInput.style.display='none';
+        noteBtn.title=val||'Add note';
+      };
+    }
+  });
+  
+  // ── Finish session ──
+  const finish=$('[data-finish]');
+  if(finish)finish.onclick=()=>{
+    let sets=readLog();
+    if(!Object.values(sets).some(x=>x.length))return alert('Add at least one working set first.');
+    
+    const duration=workoutTimer?workoutTimer.stop():0;
+    const durationStr=GymTimers.formatDuration(duration);
+    
+    let l={
+      id:uid(),
+      workout:finish.dataset.finish,
+      date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+      duration:durationStr,
+      sets
+    };
+    state.logs.push(l);
+    save();
+    
+    if(GymSync.isConfigured()&&GymSync.isSignedIn()){
+      GymSync.pushState(state).catch(()=>{});
+    }
+    
+    location.hash=`#/summary/${l.id}`;
+  };
+  
+  // Initial totals
+  updateTotals();
+}
+
+function initSocial(){
+  const claimBtn=$('#claim-username');
+  if(claimBtn)claimBtn.onclick=async()=>{
+    const input=$('#username-input');
+    const msg=$('#username-msg');
+    if(!input||!msg)return;
+    try {
+      const profile=await GymSync.claimUsername(input.value.trim());
+      msg.textContent=`Welcome, ${profile.username}!`;
+      msg.style.color='var(--ink)';
+      await GymSync.pushState(state);
+      setTimeout(()=>render(),1000);
+    } catch(e){
+      msg.textContent=e.message;
+      msg.style.color='#c00';
+    }
+  };
+  
+  const signOut=$('#sign-out');
+  if(signOut)signOut.onclick=()=>{
+    GymSync.signOut();
+    render();
+  };
+  
+  const searchBtn=$('#social-search-btn');
+  const searchInput=$('#social-search-input');
+  if(searchBtn&&searchInput){
+    searchBtn.onclick=()=>{
+      socialSearch=searchInput.value.trim();
+      if(socialSearch)searchUser(socialSearch);
+    };
+    searchInput.onkeydown=e=>{
+      if(e.key==='Enter')searchBtn.click();
+    };
+  }
+}
+
+// ── Init ──
+window.onhashchange=render;
+render();
+updateSyncStatus();
+
+// ── Auto-sync on state changes ──
+const origSave=save;
+save=function(send=true){
+  origSave(send);
+  if(GymSync.isConfigured()&&GymSync.isSignedIn()){
+    GymSync.pushState(state).catch(()=>{});
+  }
+};
