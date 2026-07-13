@@ -1088,22 +1088,7 @@ function initSocial(){
     setTimeout(loadFriendFeed,50);
   };
   
-  // ── Friend toggle delegation ──
-  const feed=$('#friend-feed');
-  if(feed)feed.onclick=function(e){
-    const toggle=e.target.closest('.friend-toggle');
-    if(!toggle)return;
-    const card=toggle.closest('.friend-card');
-    if(!card)return;
-    const body=card.querySelector('.friend-workouts');
-    if(body){
-      const shown=body.style.display!=='none';
-      body.style.display=shown?'none':'block';
-      toggle.textContent=shown?'Show workouts ▾':'Hide workouts ▴';
-    }
-  };
-  
-  // ── Load feed ──
+  // ── Load feed (click handlers set inline in loadFriendFeed) ──
   loadFriendFeed();
 }
 
@@ -1124,31 +1109,34 @@ async function loadFriendFeed(){
       const totalVol=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((v,s)=>v+s.reps*s.weight,0),0);
       const totalSets=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0);
       const sessionCount=workingLogs.length;
-      const uid=friendData?.uid||friendName;
-      const cardId='fc-'+uid.replace(/[^a-zA-Z0-9]/g,'');
+      const initial=friendName.charAt(0).toUpperCase();
       
-      let html=`<div class="friend-card" id="${cardId}">
-        <div class="friend-card-header">
-          <div><h3>${esc(friendName)}</h3>
-          <div class="friend-stats"><b>${sessionCount}</b> sessions · <b>${fmt(totalSets)}</b> sets · <b>${fmt(totalVol)} kg</b></div></div>
-          <button class="friend-toggle" data-target="${cardId}">${workingLogs.length?'Show workouts ▾':'No workouts'}</button>
+      let html=`<div class="friend-card">
+        <div class="fc-head">
+          <div class="fc-avatar">${initial}</div>
+          <div class="fc-info">
+            <div class="fc-name">${esc(friendName)}</div>
+            <div class="fc-meta">${sessionCount} sessions · ${fmt(totalSets)} sets · ${fmt(totalVol)} kg</div>
+          </div>
+          <div class="fc-arrow">${workingLogs.length?'▸':''}</div>
         </div>`;
       
       if(workingLogs.length){
-        html+=`<div class="friend-workouts" style="display:none">`;
-        workingLogs.slice().reverse().forEach(l=>{
+        html+=`<div class="fc-body">`;
+        workingLogs.slice().reverse().slice(0,5).forEach(l=>{
           const wName=workouts.find(w=>w.id===l.workout)?.name||'Workout';
           const allWorkSets=Object.entries(l.sets||{}).flatMap(([exId,sets])=>sets.filter(s=>!s.warmup).map(s=>({...s,exId})));
           const vol=allWorkSets.reduce((a,s)=>a+s.reps*s.weight,0);
-          html+=`<div class="friend-workout">
-            <div class="friend-workout-head">
-              <span><b>${esc(wName)}</b> · ${l.date}</span>
-              <span>${allWorkSets.length} sets · ${fmt(vol)} kg</span>
+          html+=`<div class="fc-session">
+            <div class="fc-session-head">
+              <span class="fc-session-name">${esc(wName)}</span>
+              <span class="fc-session-date">${l.date}</span>
+              <span class="fc-session-vol">${fmt(vol)} kg</span>
             </div>
-            <div class="friend-workout-exs">${allWorkSets.map(s=>{
+            <div class="fc-session-body">${allWorkSets.map(s=>{
               const ex=byId(s.exId);
               const name=ex?ex.name:'Unknown';
-              return `<span class="friend-ex">${esc(name)} <em>${s.reps}×${s.weight} kg</em></span>`;
+              return `<span class="fc-ex">${esc(name)} <b>${s.reps}×${s.weight}</b></span>`;
             }).join('')}</div>
           </div>`;
         });
@@ -1156,6 +1144,18 @@ async function loadFriendFeed(){
       }
       html+=`</div>`;
       feed.innerHTML+=html;
+    });
+    
+    // ── Click to expand/collapse ──
+    feed.querySelectorAll('.friend-card').forEach(card=>{
+      card.onclick=function(){
+        const body=this.querySelector('.fc-body');
+        const arrow=this.querySelector('.fc-arrow');
+        if(!body)return;
+        const open=body.style.display!=='none';
+        body.style.display=open?'none':'block';
+        if(arrow)arrow.textContent=open?'▸':'▾';
+      };
     });
   } catch(e){
     feed.innerHTML=`<p class="message" style="color:#c00">Error loading feed: ${esc(e.message)}</p>`;
