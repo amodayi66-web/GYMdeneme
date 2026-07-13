@@ -1133,11 +1133,27 @@ async function loadFriendFeed(){
               <span class="fc-session-date">${l.date}</span>
               <span class="fc-session-vol">${fmt(vol)} kg</span>
             </div>
-            <div class="fc-session-body">${allWorkSets.map(s=>{
-              const ex=byId(s.exId);
-              const name=ex?ex.name:'Unknown';
-              return `<span class="fc-ex">${esc(name)} <b>${s.reps}×${s.weight}</b></span>`;
-            }).join('')}</div>
+            <div class="fc-session-body">${(()=>{
+              // Group sets by exercise
+              const grouped={};
+              allWorkSets.forEach(s=>{
+                const ex=byId(s.exId);
+                const name=ex?ex.name:'Unknown';
+                if(!grouped[name])grouped[name]=[];
+                grouped[name].push(s);
+              });
+              return Object.entries(grouped).map(([name,sets])=>{
+                const totalReps=sets.reduce((a,s)=>a+s.reps,0);
+                const totalWeight=sets.reduce((a,s)=>a+s.weight,0);
+                const avgWeight=sets.length?Math.round(totalWeight/sets.length):0;
+                return `<div class="fc-ex-row">
+                  <span class="fc-ex-name">${esc(name)}</span>
+                  <span class="fc-ex-sets">${sets.length} set${sets.length>1?'s':''}</span>
+                  <span class="fc-ex-detail">${sets.map(s=>`${s.reps}×${s.weight}`).join(' · ')}</span>
+                  <span class="fc-ex-vol">${fmt(totalReps*avgWeight)} kg</span>
+                </div>`;
+              }).join('');
+            })()}</div>
           </div>`;
         });
         html+=`</div>`;
