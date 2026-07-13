@@ -1108,71 +1108,136 @@ async function loadFriendFeed(){
       const workingLogs=logs.filter(l=>Object.values(l.sets||{}).some(sets=>sets.some(s=>!s.warmup)));
       const totalVol=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((v,s)=>v+s.reps*s.weight,0),0);
       const totalSets=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0);
+      const totalReps=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((r,s)=>r+s.reps,0),0);
       const sessionCount=workingLogs.length;
-      const initial=friendName.charAt(0).toUpperCase();
+      
+      // Get all unique muscle groups across all exercises used
+      const allExIds=new Set();
+      workingLogs.forEach(l=>Object.keys(l.sets||{}).forEach(exId=>allExIds.add(exId)));
+      const muscleTags=[...new Set([...allExIds].flatMap(exId=>{const e=byId(exId);return e?e.muscles:[]}))].slice(0,5);
+      
+      // Most recent session (expanded)
+      const sortedLogs=workingLogs.slice().reverse();
+      const latest=sortedLogs[0];
+      const restLogs=sortedLogs.slice(1);
+      
+      const latestWName=latest?workouts.find(w=>w.id===latest.workout)?.name||'Workout':'';
+      const latestSets=latest?Object.entries(latest.sets||{}).flatMap(([exId,sets])=>sets.filter(s=>!s.warmup).map(s=>({...s,exId}))):[];
+      const latestVol=latestSets.reduce((a,s)=>a+s.reps*s.weight,0);
+      const latestReps=latestSets.reduce((a,s)=>a+s.reps,0);
+      
+      // Group latest sets by exercise
+      const grouped={};
+      latestSets.forEach(s=>{
+        const ex=byId(s.exId);
+        const name=ex?ex.name:'Unknown';
+        if(!grouped[name])grouped[name]=[];
+        grouped[name].push(s);
+      });
       
       let html=`<div class="friend-card">
-        <div class="fc-head">
-          <div class="fc-avatar">${initial}</div>
-          <div class="fc-info">
-            <div class="fc-name">${esc(friendName)}</div>
-            <div class="fc-meta">${sessionCount} sessions · ${fmt(totalSets)} sets · ${fmt(totalVol)} kg</div>
-          </div>
-          <div class="fc-arrow">${workingLogs.length?'▸':''}</div>
+        <div class="card-header">
+          <div class="username">@${esc(friendName)}</div>
+          <div class="total-sessions"><strong>${sessionCount}</strong> sessions</div>
         </div>`;
       
-      if(workingLogs.length){
-        html+=`<div class="fc-body">`;
-        workingLogs.slice().reverse().slice(0,5).forEach(l=>{
-          const wName=workouts.find(w=>w.id===l.workout)?.name||'Workout';
-          const allWorkSets=Object.entries(l.sets||{}).flatMap(([exId,sets])=>sets.filter(s=>!s.warmup).map(s=>({...s,exId})));
-          const vol=allWorkSets.reduce((a,s)=>a+s.reps*s.weight,0);
-          html+=`<div class="fc-session">
-            <div class="fc-session-head">
-              <span class="fc-session-name">${esc(wName)}</span>
-              <span class="fc-session-date">${l.date}</span>
-              <span class="fc-session-vol">${fmt(vol)} kg</span>
+      if(latest){
+        html+=`<div class="routine-title-row">
+          <h2 class="routine-name">${esc(latestWName)}</h2>
+          <div class="total-weight"><strong>${fmt(totalVol)}</strong> kg total</div>
+        </div>
+        <div class="workout-date">${latest.date}</div>
+        <hr class="divider">
+        <div class="overview-metrics">
+          <div class="metric-box"><div class="metric-value">${fmt(latestVol)}</div><div class="metric-label">kg vol</div></div>
+          <div class="metric-box"><div class="metric-value">${fmt(latestReps)}</div><div class="metric-label">reps</div></div>
+          <div class="metric-box"><div class="metric-value">${latestSets.length}</div><div class="metric-label">sets</div></div>
+        </div>`;
+        
+        if(muscleTags.length){
+          html+=`<div class="tags-container">${muscleTags.map(m=>`<span class="tag">${esc(m)}</span>`).join('')}</div>`;
+        }
+        
+        html+=`<div class="section-label">Last Session</div>
+        <div class="exercise-list">${Object.entries(grouped).map(([name,sets])=>{
+          const exVol=sets.reduce((a,s)=>a+s.reps*s.weight,0);
+          return `<div class="exercise-item">
+            <div class="exercise-header">
+              <span class="exercise-name">${esc(name)}</span>
+              <span class="exercise-total-weight">${fmt(exVol)} kg</span>
             </div>
-            <div class="fc-session-body">${(()=>{
-              // Group sets by exercise
-              const grouped={};
-              allWorkSets.forEach(s=>{
-                const ex=byId(s.exId);
-                const name=ex?ex.name:'Unknown';
-                if(!grouped[name])grouped[name]=[];
-                grouped[name].push(s);
-              });
-              return Object.entries(grouped).map(([name,sets])=>{
-                const totalReps=sets.reduce((a,s)=>a+s.reps,0);
-                const totalWeight=sets.reduce((a,s)=>a+s.weight,0);
-                const avgWeight=sets.length?Math.round(totalWeight/sets.length):0;
-                return `<div class="fc-ex-row">
-                  <span class="fc-ex-name">${esc(name)}</span>
-                  <span class="fc-ex-sets">${sets.length} set${sets.length>1?'s':''}</span>
-                  <span class="fc-ex-detail">${sets.map(s=>`${s.reps}×${s.weight}`).join(' · ')}</span>
-                  <span class="fc-ex-vol">${fmt(totalReps*avgWeight)} kg</span>
-                </div>`;
-              }).join('');
-            })()}</div>
+            <div class="exercise-sets">${sets.map(s=>`${s.reps}×${s.weight}kg`).join(' · ')}</div>
           </div>`;
-        });
-        html+=`</div>`;
+        }).join('')}</div>`;
+        
+        // Toggle button
+        html+=`<button class="toggle-btn" data-fc-toggle="${friendName.replace(/[^a-zA-Z0-9]/g,'')}">▲ Hide workouts</button>`;
+        
+        // Other sessions (collapsed)
+        if(restLogs.length){
+          html+=`<div class="fc-other-sessions" style="display:none">`;
+          restLogs.forEach(l=>{
+            const wName=workouts.find(w=>w.id===l.workout)?.name||'Workout';
+            const sets=Object.entries(l.sets||{}).flatMap(([exId,sets])=>sets.filter(s=>!s.warmup).map(s=>({...s,exId})));
+            const vol=sets.reduce((a,s)=>a+s.reps*s.weight,0);
+            const reps=sets.reduce((a,s)=>a+s.reps,0);
+            html+=`<div class="minimal-routine">
+              <div class="minimal-header">
+                <h2 class="routine-name" style="font-size:16px">${esc(wName)}</h2>
+                <span class="workout-date" style="margin-bottom:0">${l.date}</span>
+              </div>
+              <div class="minimal-stats">${fmt(vol)} kg · ${fmt(reps)} reps · ${sets.length} sets</div>
+            </div>`;
+          });
+          html+=`</div>`;
+          // Show more button
+          html+=`<button class="toggle-btn show-more-btn" data-fc-more="${friendName.replace(/[^a-zA-Z0-9]/g,'')}">▼ Show ${restLogs.length} more session${restLogs.length>1?'s':''}</button>`;
+        }
+      } else {
+        html+=`<div class="empty" style="margin:12px 0"><p>No workouts synced yet.</p></div>`;
       }
+      
       html+=`</div>`;
       feed.innerHTML+=html;
     });
     
-    // ── Click to expand/collapse ──
-    feed.querySelectorAll('.friend-card').forEach(card=>{
-      card.onclick=function(){
-        const body=this.querySelector('.fc-body');
-        const arrow=this.querySelector('.fc-arrow');
-        if(!body)return;
-        const open=body.style.display!=='none';
-        body.style.display=open?'none':'block';
-        if(arrow)arrow.textContent=open?'▸':'▾';
+    // ── Toggle buttons ──
+    feed.querySelectorAll('.toggle-btn[data-fc-toggle]').forEach(btn=>{
+      btn.onclick=function(e){
+        e.stopPropagation();
+        const card=this.closest('.friend-card');
+        if(!card)return;
+        const body=card.querySelector('.exercise-list');
+        const metrics=card.querySelector('.overview-metrics');
+        const tags=card.querySelector('.tags-container');
+        const label=card.querySelector('.section-label');
+        const divider=card.querySelector('.divider');
+        const date=card.querySelector('.workout-date');
+        const routineRow=card.querySelector('.routine-title-row');
+        const header=card.querySelector('.card-header');
+        const otherSessions=card.querySelector('.fc-other-sessions');
+        const showMore=card.querySelector('.show-more-btn');
+        const items=[body,metrics,tags,label,divider,date,routineRow,header,otherSessions,showMore].filter(Boolean);
+        const hidden=body&&body.style.display==='none';
+        items.forEach(el=>el.style.display=hidden?'':'none');
+        this.textContent=hidden?'▲ Hide workouts':'▼ Show workouts';
       };
     });
+    
+    feed.querySelectorAll('.show-more-btn').forEach(btn=>{
+      btn.onclick=function(e){
+        e.stopPropagation();
+        const card=this.closest('.friend-card');
+        if(!card)return;
+        const other=card.querySelector('.fc-other-sessions');
+        if(other){
+          const hidden=other.style.display==='none';
+          other.style.display=hidden?'block':'none';
+          this.textContent=hidden?'▲ Hide older sessions':'▼ Show more sessions';
+        }
+      };
+    });
+    
   } catch(e){
     feed.innerHTML=`<p class="message" style="color:#c00">Error loading feed: ${esc(e.message)}</p>`;
   }
