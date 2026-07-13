@@ -1153,21 +1153,6 @@ async function loadFriendFeed(){
           </div>`;
         });
         html+=`</div>`;
-        
-        // Toggle binding inline — we'll also set it below
-        setTimeout(()=>{
-          const card=document.getElementById(cardId);
-          if(!card)return;
-          const toggle=card.querySelector('.friend-toggle');
-          if(toggle)toggle.onclick=()=>{
-            const body=card.querySelector('.friend-workouts');
-            if(body){
-              const shown=body.style.display!=='none';
-              body.style.display=shown?'none':'block';
-              toggle.textContent=shown?'Show workouts ▾':'Hide workouts ▴';
-            }
-          };
-        },10);
       }
       html+=`</div>`;
       feed.innerHTML+=html;
