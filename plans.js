@@ -55,15 +55,15 @@ const PLANS = [
   },
   {
     id:'dr-swole-fullbody',
-    name:'Dr. Swole Full Body',
+    name:'Dr. Swole Full Body Powerbuilding Split',
     level:'Beginner',
     goal:'General',
-    duration:'50 min · 8 weeks',
-    desc:'Dr. Swole\'s full body split. Hit every major muscle group three times per week with compound focus.',
+    duration:'60 min · 8 weeks',
+    desc:'Dr. Swole\'s science-based 3 Day Full Body Powerbuilding Split. Designed for hypertrophy and strength. Train full body 3x a week using Greyskull LP progression on main lifts with RPE-based accessory work.',
     days:[
-      ['Full Body A',['Barbell Back Squat','Barbell Bench Press','Barbell Row','Dumbbell Lateral Raise','Plank']],
-      ['Full Body B',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Pull-up','Dumbbell Curl','Hanging Leg Raise']],
-      ['Full Body C',['Barbell Back Squat','Barbell Incline Bench Press','Barbell Row','Dumbbell Hammer Curl','Plank']]
+      ['Full Body A',['Barbell Back Squat','Barbell Bench Press','Barbell Lunges','Barbell Row','Dumbbell Hammer Curl','Cable Triceps Pushdown','Dumbbell Lateral Raise','Calf Raise Machine (Standing)']],
+      ['Full Body B',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Leg Press','Barbell Bench Press','Pull-up','EZ Bar Curl','Barbell Upright Row','Calf Raise Machine (Standing)']],
+      ['Full Body C',['Barbell Back Squat','Barbell Bench Press','Romanian Deadlift','Cable Row','Dumbbell Curl','EZ Bar Skull Crusher','Dumbbell Lateral Raise','Calf Raise Machine (Standing)']]
     ]
   },
   {

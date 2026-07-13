@@ -173,7 +173,10 @@ function workout(id){
   return `<a class="back" href="#/">← My plan</a>
   <div class="session-head"><div>${head(esc(w.name),`${w.exercises.length} movements. Keep the session simple and focused.`)}</div><a class="button" href="#/log/${w.id}">Start session →</a></div>
   <div class="workout-grid">${w.exercises.map(x=>{let e=byId(x);return `<article class="workout-card"><small>${e.category.toUpperCase()}</small><h2>${e.name}</h2><p>${e.muscles.join(' · ')}</p><div class="card-foot"><span>WORKING MUSCLES</span></div></article>`}).join('')}</div>
-  <button style="margin-top:30px" class="button white" data-delete="${w.id}">Delete workout</button>`;
+  <div style="display:flex;gap:12px;margin-top:30px;flex-wrap:wrap">
+    <a class="button mint" href="#/edit/${w.id}">✎ Edit workout</a>
+    <button class="button white" data-delete="${w.id}">Delete workout</button>
+  </div>`;
 }
 
 // ── LOG PAGE (Live Session) ────────────────────────────────────────────
@@ -197,6 +200,12 @@ function log(id){
   
   return `<a class="back" href="#/workout/${id}">← ${esc(w.name)}</a>
   <div class="session-head"><div>${head(esc(w.name),'Log the working sets that count.')}</div><span class="eyebrow">LIVE SESSION</span></div>
+  <button class="button white small" id="add-exercise-btn" style="margin-bottom:16px">+ Add exercise</button>
+  <div id="add-exercise-panel" style="display:none;border:var(--line);background:var(--mint);padding:16px;margin-bottom:16px">
+    <div class="eyebrow" style="margin-bottom:8px">Search exercises to add</div>
+    <input id="add-ex-search" class="search-input" placeholder="Search..." style="margin-bottom:8px">
+    <div id="add-ex-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;max-height:200px;overflow-y:auto"></div>
+  </div>
   
   <!-- Workout Timer -->
   <div class="timer-section">
@@ -231,11 +240,7 @@ function log(id){
     const swapEx=getSimilarExercises(x);
     const swapHtml=swapEx.length?`<div class="swap-section"><button class="swap-btn" data-swap="${x}">↔ Swap</button><div class="swap-options" id="swap-${x}" style="display:none">${swapEx.map(s=>`<button class="swap-option" data-swap-from="${x}" data-swap-to="${s.id}">${esc(s.name)}</button>`).join('')}</div></div>`:'';
     const warmupSets=`<div class="warmup-section"><button class="toggle-warmup" data-exercise="${x}">+ Warm-up sets</button><div class="warmup-sets" id="warmup-${x}" style="display:none"></div></div>`;
-    const prevSetsData=getPreviousSets(x);
-    const row1=prevSetsData&&prevSetsData.sets[0]?setRow(1,prevSetsData.sets[0].reps,prevSetsData.sets[0].weight):setRow(1);
-    const row2=prevSetsData&&prevSetsData.sets[1]?setRow(2,prevSetsData.sets[1].reps,prevSetsData.sets[1].weight):setRow(2);
-    const row3=prevSetsData&&prevSetsData.sets[2]?setRow(3,prevSetsData.sets[2].reps,prevSetsData.sets[2].weight):setRow(3);
-    return `<article class="log-card" data-exercise="${x}"><div class="log-card-header"><h2>${e.name}</h2>${swapHtml}</div><small>${e.muscles.join(' · ')}</small>${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}<div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span><span>Prev</span></div><div class="sets">${row1}${row2}${row3}</div><button class="add-set">+ add set</button></article>`;
+    return `<article class="log-card" data-exercise="${x}"><div class="log-card-header"><h2>${e.name}</h2>${swapHtml}</div><small>${e.muscles.join(' · ')}</small>${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}<div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span></div><div class="sets">${setRow(1)}${setRow(2)}${setRow(3)}</div><button class="add-set">+ add set</button></article>`;
   }).join('')}</section><aside class="totals">
     <div class="eyebrow">SESSION TOTAL</div>
     <h2>Today’s work</h2>
@@ -581,68 +586,44 @@ function renderMusclePie(){
 }
 
 // ── SOCIAL PAGE ────────────────────────────────────────────────────────
-let socialSearch='';
 function social(){
   const profile=GymSync.currentProfile();
   const isSignedIn=GymSync.isSignedIn();
   const isConfigured=GymSync.isConfigured();
+  const friendsList=state.friends||[];
   
-  return `<div class="social-head">${head('Social.','See what others are training. Search for a username to view their workouts.')}</div>
+  return `<section class="hero">
+    <div class="eyebrow">TRAINING PLANNER</div>
+    <h1>Social.</h1>
+    <p class="intro">See what your friends are training and share your progress.</p>
+  </section>
   
-  ${!isConfigured?`<div class="social-empty"><h3>Cloud sync not configured</h3><p>Set up Firebase to use social features.</p></div>`:
-  !isSignedIn?`<div class="social-empty"><h3>Choose a username to get started</h3>
-    <div style="display:flex;gap:8px;margin-top:12px;justify-content:center">
-      <input id="username-input" class="text-input" style="max-width:250px" placeholder="Your username..." maxlength="20">
-      <button class="button" id="claim-username">Claim →</button>
-    </div>
-    <p id="username-msg" style="font:10px 'DM Mono',monospace;margin-top:8px"></p>
-  </div>`:
-  `<div class="social-profile"><h2>${esc(profile.username)}</h2>
-    <div class="stats"><span><b>${state.logs.length}</b> sessions</span><span><b>${state.workouts.length}</b> workouts</span></div>
-    <button class="button white small" id="sign-out" style="margin-top:10px">Sign out</button>
-  </div>`}
-  
-  ${isSignedIn?`<div class="social-search">
-    <input id="social-search-input" placeholder="Search username..." value="${esc(socialSearch)}">
-    <button class="button" id="social-search-btn">Search</button>
-  </div>
-  <div id="social-results"></div>`:''}`;
-}
-
-async function searchUser(username){
-  const results=$('#social-results');
-  if(!results)return;
-  results.innerHTML='<p style="color:#999">Searching...</p>';
-  
-  try {
-    const friends=await GymSync.friendsFeed();
-    const userData=friends.find(f=>f.username.toLowerCase()===username.toLowerCase());
-    
-    if(userData&&userData.logs&&userData.logs.length){
-      const logs=userData.logs;
-      const totalVol=logs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((s,set)=>s+set.reps*set.weight,0),0);
-      const totalSets=logs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0);
+  ${!isConfigured?`<div class="empty" style="margin-top:24px"><h3>Cloud sync not configured</h3><p>Set up Firebase to use social features.</p></div>`:
+  `<section class="social-setup">
+    <div class="builder-box">
+      <label class="label" for="username-input">Your username</label>
+      <div class="username-row">
+        <input id="username-input" class="text-input" maxlength="30" placeholder="e.g. alex_lifter" value="${esc(state.username||'')}">
+        <button class="button" id="set-username-btn">Set</button>
+      </div>
+      <p class="message" id="username-msg">Set a username to sync across devices and let friends find your workouts.</p>
       
-      results.innerHTML=`<div class="social-profile"><h2>${esc(userData.username)}</h2>
-        <div class="stats"><span><b>${logs.length}</b> sessions</span><span><b>${fmt(totalVol)} kg</b> total volume</span><span><b>${totalSets}</b> sets</span></div></div>
-        <h3 style="font-size:16px;margin:16px 0 10px">Recent Workouts</h3>
-        ${logs.slice().reverse().slice(0,10).map(l=>{
-          const wName=userData.workouts?.find(w=>w.id===l.workout)?.name||'Workout';
-          const vol=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((a,s)=>a+s.reps*s.weight,0);
-          const sets=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length;
-          return `<div class="social-workout"><h3>${esc(wName)}</h3>
-            <div class="meta">${l.date} · ${sets} sets · ${fmt(vol)} kg</div>
-            <div class="ex-list">${Object.entries(l.sets||{}).map(([exId,sets])=>{
-              const ex=byId(exId);
-              return ex?`<span>${esc(ex.name)} (${sets.length} sets)</span>`:'';
-            }).join('')}</div></div>`;
-        }).join('')}`;
-    } else {
-      results.innerHTML=`<div class="social-empty"><h3>No results for "${esc(username)}"</h3><p>This user hasn't synced any workouts yet, or the username doesn't exist.</p></div>`;
-    }
-  } catch(e){
-    results.innerHTML=`<div class="social-error">Error: ${esc(e.message)}</div>`;
-  }
+      <label class="label" style="margin-top:20px;display:block">Friends</label>
+      <div class="username-row">
+        <input id="friend-input" class="text-input" maxlength="30" placeholder="Add friend's username">
+        <button class="button mint" id="add-friend-btn">Add</button>
+      </div>
+      <div class="friends-list" id="friends-list">
+        ${friendsList.length?friendsList.map(f=>`<div class="friend-chip">${esc(f)} <button class="remove" data-remove-friend="${esc(f)}">×</button></div>`).join(''):'<p class="message">No friends added yet.</p>'}
+      </div>
+    </div>
+  </section>
+  
+  <section>
+    <div class="section-head"><div><div class="eyebrow">FRIENDS’ PROGRESS</div><h2>Workout Feed</h2></div></div>
+    ${!friendsList.length?`<div class="empty"><p>Add friends by their username to see their latest workouts here.</p></div>`:
+    `<div id="friend-feed" class="friend-summary-grid"><p class="message">Loading…</p></div>`}
+  </section>`}`;
 }
 
 // ── ROUTER ─────────────────────────────────────────────────────────────
@@ -656,6 +637,7 @@ function render(){
     case 'templates': $('#app').innerHTML=templates(); renderTemplates(); break;
     case 'builder': $('#app').innerHTML=builder(); renderBuilder(); break;
     case 'workout': $('#app').innerHTML=workout(p[1]); break;
+    case 'edit': $('#app').innerHTML=editWorkout(p[1]); setTimeout(initEditWorkout,50); break;
     case 'log': $('#app').innerHTML=log(p[1]); setTimeout(initLog,50); break;
     case 'summary': $('#app').innerHTML=summary(p[1]); break;
     case 'progress': $('#app').innerHTML=progress(); setTimeout(initProgress,50); break;
@@ -931,11 +913,17 @@ function initLog(){
         </div>`;
       });
     }
-    html+=`<button style="margin-top:8px;border:2px solid var(--ink);background:var(--paper);padding:8px 16px;font-weight:700;cursor:pointer" onclick="this.closest('div').closest('div').remove()">Close</button>
+    html+=`<button style="margin-top:8px;border:2px solid var(--ink);background:var(--paper);padding:8px 16px;font-weight:700;cursor:pointer" id="pr-popup-close">Close</button>
     </div></div>`;
     const div=document.createElement('div');
     div.innerHTML=html;
     document.body.appendChild(div);
+    // Close on overlay click or close button click
+    div.onclick=()=>div.remove();
+    const inner=div.querySelector('div');
+    if(inner)inner.onclick=e=>e.stopPropagation();
+    const closeBtn=div.querySelector('#pr-popup-close');
+    if(closeBtn)closeBtn.onclick=()=>div.remove();
   });
   
   // ── Exercise notes ──
@@ -975,6 +963,44 @@ function initLog(){
     }
   });
   
+  // ── Add Exercise toggle ──
+  const addExBtn=$('#add-exercise-btn');
+  const addExPanel=$('#add-exercise-panel');
+  if(addExBtn&&addExPanel){
+    addExBtn.onclick=()=>{
+      const shown=addExPanel.style.display!=='none';
+      addExPanel.style.display=shown?'none':'block';
+      if(!shown)renderAddExerciseList('');
+    };
+  }
+  
+  // ── Add Exercise search ──
+  const addExSearch=$('#add-ex-search');
+  if(addExSearch){
+    addExSearch.oninput=function(){
+      renderAddExerciseList(this.value);
+    };
+  }
+  
+  // ── Add Exercise list click ──
+  const addExList=$('#add-ex-list');
+  if(addExList){
+    addExList.onclick=function(e){
+      const btn=e.target.closest('[data-add-ex]');
+      if(!btn)return;
+      const exId=btn.dataset.addEx;
+      const ex=byId(exId);
+      if(!ex)return;
+      const id=location.hash.split('/')[2];
+      const w=state.workouts.find(x=>x.id===id);
+      if(w){
+        w.exercises.push(exId);
+        save();
+        render();
+      }
+    };
+  }
+  
   // ── Finish session ──
   const finish=$('[data-finish]');
   if(finish)finish.onclick=()=>{
@@ -1006,40 +1032,225 @@ function initLog(){
 }
 
 function initSocial(){
-  const claimBtn=$('#claim-username');
-  if(claimBtn)claimBtn.onclick=async()=>{
+  // ── Set username ──
+  const setBtn=$('#set-username-btn');
+  if(setBtn)setBtn.onclick=async()=>{
     const input=$('#username-input');
     const msg=$('#username-msg');
     if(!input||!msg)return;
+    const name=input.value.trim();
+    if(!name)return msg.textContent='Enter a username.';
     try {
-      const profile=await GymSync.claimUsername(input.value.trim());
-      msg.textContent=`Welcome, ${profile.username}!`;
+      const profile=await GymSync.claimUsername(name);
+      state.username=profile.username;
+      save();
+      msg.textContent=`Signed in as ${profile.username}!`;
       msg.style.color='var(--ink)';
       await GymSync.pushState(state);
-      setTimeout(()=>render(),1000);
+      setTimeout(()=>render(),800);
     } catch(e){
       msg.textContent=e.message;
       msg.style.color='#c00';
     }
   };
   
-  const signOut=$('#sign-out');
-  if(signOut)signOut.onclick=()=>{
-    GymSync.signOut();
-    render();
+  // ── Add friend ──
+  const addBtn=$('#add-friend-btn');
+  if(addBtn)addBtn.onclick=async()=>{
+    const input=$('#friend-input');
+    if(!input)return;
+    const name=input.value.trim();
+    if(!name)return;
+    if(!state.friends)state.friends=[];
+    if(state.friends.includes(name))return;
+    try {
+      await GymSync.addFriend(name);
+      state.friends.push(name);
+      save();
+      input.value='';
+      render();
+      // Load feed after render
+      setTimeout(loadFriendFeed,50);
+    } catch(e){
+      const msg=$('#username-msg');
+      if(msg){msg.textContent=e.message;msg.style.color='#c00';}
+    }
   };
   
-  const searchBtn=$('#social-search-btn');
-  const searchInput=$('#social-search-input');
-  if(searchBtn&&searchInput){
-    searchBtn.onclick=()=>{
-      socialSearch=searchInput.value.trim();
-      if(socialSearch)searchUser(socialSearch);
-    };
-    searchInput.onkeydown=e=>{
-      if(e.key==='Enter')searchBtn.click();
-    };
+  // ── Remove friend ──
+  const friendsList=$('#friends-list');
+  if(friendsList)friendsList.onclick=async e=>{
+    if(!e.target.dataset.removeFriend)return;
+    const name=e.target.dataset.removeFriend;
+    if(state.friends)state.friends=state.friends.filter(f=>f!==name);
+    save();
+    render();
+    setTimeout(loadFriendFeed,50);
+  };
+  
+  // ── Load feed ──
+  loadFriendFeed();
+}
+
+async function loadFriendFeed(){
+  const feed=$('#friend-feed');
+  if(!feed)return;
+  feed.innerHTML='<p class="message">Loading…</p>';
+  try {
+    const data=await GymSync.friendsFeed();
+    const friendsState=state.friends||[];
+    if(!friendsState.length){feed.innerHTML='';return;}
+    feed.innerHTML='';
+    friendsState.forEach(friendName=>{
+      const friendData=data.find(d=>d.username&&d.username.toLowerCase()===friendName.toLowerCase());
+      const logs=friendData?.logs||[];
+      const workouts=friendData?.workouts||[];
+      const workingLogs=logs.filter(l=>Object.values(l.sets||{}).some(sets=>sets.some(s=>!s.warmup)));
+      const totalVol=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((v,s)=>v+s.reps*s.weight,0),0);
+      const totalSets=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0);
+      const sessionCount=workingLogs.length;
+      
+      let html=`<div class="friend-card">
+        <div class="friend-card-header">
+          <h3>${esc(friendName)}</h3>
+          <span class="friend-stats">${sessionCount} sessions · ${fmt(totalSets)} sets · ${fmt(totalVol)} kg</span>
+        </div>`;
+      
+      if(workingLogs.length){
+        const recent=workingLogs.slice(-3).reverse();
+        recent.forEach(l=>{
+          const wName=workouts.find(w=>w.id===l.workout)?.name||'Workout';
+          const allWorkSets=Object.entries(l.sets||{}).flatMap(([exId,sets])=>sets.filter(s=>!s.warmup).map(s=>({...s,exId})));
+          const vol=allWorkSets.reduce((a,s)=>a+s.reps*s.weight,0);
+          html+=`<div class="friend-workout">
+            <div class="friend-workout-head"><b>${esc(wName)}</b> <span>${l.date} · ${allWorkSets.length} sets · ${fmt(vol)} kg</span></div>
+            <div class="friend-workout-exs">${allWorkSets.slice(0,8).map(s=>{
+              const ex=byId(s.exId);
+              return ex?`<span class="friend-ex">${esc(ex.name)} ${s.reps}×${s.weight}</span>`:'';
+            }).join(' ')}</div>
+          </div>`;
+        });
+      } else {
+        html+=`<p class="message" style="padding:8px">No workouts synced yet.</p>`;
+      }
+      html+=`</div>`;
+      feed.innerHTML+=html;
+    });
+  } catch(e){
+    feed.innerHTML=`<p class="message" style="color:#c00">Error loading feed: ${esc(e.message)}</p>`;
   }
+}
+
+// ── Render add exercise list ──
+function renderAddExerciseList(query){
+  const container=$('#add-ex-list');
+  if(!container)return;
+  const choices=EX.filter(e=>!query||e.name.toLowerCase().includes(query.toLowerCase())).slice(0,30);
+  container.innerHTML=choices.map(e=>`<button class="filter" data-add-ex="${e.id}" style="text-align:left;font-size:11px">${esc(e.name)}</button>`).join('');
+}
+
+// ── EDIT WORKOUT PAGE ──────────────────────────────────────────────────
+function editWorkout(id){
+  let w=state.workouts.find(x=>x.id===id);
+  if(!w)return home();
+  const allExIds=w.exercises;
+  return `<a class="back" href="#/workout/${id}">← Back to workout</a>
+  <div class="builder-head"><div>${head('Edit workout.','Add or remove exercises from this workout.')}</div></div>
+  <div class="builder"><section class="builder-box">
+    <label class="label" for="edit-workout-name">Workout name</label>
+    <input id="edit-workout-name" class="text-input" maxlength="50" value="${esc(w.name)}">
+    <input id="edit-search-exercises" class="search-input" placeholder="Search exercises...">
+    <div class="eyebrow" style="margin-bottom:6px">Muscle group</div>
+    <div id="edit-muscle-filters" class="filter-row compact"></div>
+    <div class="eyebrow" style="margin-bottom:6px">Equipment</div>
+    <div id="edit-equip-filters" class="filter-row compact"></div>
+    <div id="edit-exercise-list" class="exercise-list"></div>
+  </section><aside class="selection">
+    <div class="eyebrow">EXERCISES IN WORKOUT</div>
+    <h2><span id="edit-count">${allExIds.length}</span> exercises</h2>
+    <ol id="edit-selected-list" class="selected-list">${allExIds.map((x,i)=>`<li>${String(i+1).padStart(2,'0')} · ${byId(x).name}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('')}</ol>
+    <button id="save-edit-workout" class="button">Save changes →</button>
+    <p id="edit-message" class="message"></p>
+  </aside></div>`;
+}
+
+let editSelected=[],editCategory='All',editMuscleFilter='All',editSearchQuery='';
+
+function renderEditBuilder(){
+  let wId=location.hash.split('/')[2];
+  let w=state.workouts.find(x=>x.id===wId);
+  if(!w)return;
+  editSelected=[...w.exercises];
+  
+  let choices=EX.filter(e=>{
+    if(editSearchQuery&&!e.name.toLowerCase().includes(editSearchQuery.toLowerCase()))return false;
+    if(editMuscleFilter!=='All'&&!e.muscles.includes(editMuscleFilter))return false;
+    if(editCategory!=='All'&&e.category!==editCategory)return false;
+    return true;
+  });
+  
+  const muscles=getMuscleGroups();
+  const mf=$('#edit-muscle-filters');
+  if(mf)mf.innerHTML=['All',...muscles].map(x=>`<button class="filter ${x===editMuscleFilter?'active':''}" data-edit-muscle="${x}">${x}</button>`).join('');
+  
+  const equip=getEquipmentTypes();
+  const ef=$('#edit-equip-filters');
+  if(ef)ef.innerHTML=['All',...equip].map(x=>`<button class="filter ${x===editCategory?'active':''}" data-edit-category="${x}">${x}</button>`).join('');
+  
+  const el=$('#edit-exercise-list');
+  if(el)el.innerHTML=choices.map(e=>`<button class="exercise-item ${editSelected.includes(e.id)?'selected':''}" data-edit-exercise="${e.id}"><b>${e.name}</b><small>${e.category} · ${e.muscles.join(', ')}</small></button>`).join('');
+  
+  const ec=$('#edit-count');
+  if(ec)ec.textContent=editSelected.length;
+  
+  const sl=$('#edit-selected-list');
+  if(sl)sl.innerHTML=editSelected.map((x,i)=>`<li>${String(i+1).padStart(2,'0')} · ${byId(x).name}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('');
+}
+
+function initEditWorkout(){
+  renderEditBuilder();
+  
+  const search=$('#edit-search-exercises');
+  if(search)search.oninput=function(){editSearchQuery=this.value;renderEditBuilder();};
+  
+  const mf=$('#edit-muscle-filters');
+  if(mf)mf.onclick=e=>{if(e.target.dataset.editMuscle){editMuscleFilter=e.target.dataset.editMuscle;renderEditBuilder();}};
+  
+  const ef=$('#edit-equip-filters');
+  if(ef)ef.onclick=e=>{if(e.target.dataset.editCategory){editCategory=e.target.dataset.editCategory;renderEditBuilder();}};
+  
+  const el=$('#edit-exercise-list');
+  if(el)el.onclick=e=>{
+    let b=e.target.closest('[data-edit-exercise]');
+    if(!b)return;
+    let x=b.dataset.editExercise;
+    editSelected=editSelected.includes(x)?editSelected.filter(q=>q!==x):[...editSelected,x];
+    renderEditBuilder();
+  };
+  
+  const sl=$('#edit-selected-list');
+  if(sl)sl.onclick=e=>{
+    if(e.target.dataset.editRemove){
+      editSelected=editSelected.filter(x=>x!==e.target.dataset.editRemove);
+      renderEditBuilder();
+    }
+  };
+  
+  const saveBtn=$('#save-edit-workout');
+  if(saveBtn)saveBtn.onclick=()=>{
+    const name=$('#edit-workout-name')?.value.trim();
+    const msg=$('#edit-message');
+    if(!name)return msg.textContent='Give your workout a name.';
+    if(!editSelected.length)return msg.textContent='Choose at least one exercise.';
+    const wId=location.hash.split('/')[2];
+    const w=state.workouts.find(x=>x.id===wId);
+    if(w){
+      w.name=name;
+      w.exercises=editSelected;
+      save();
+      location.hash=`#/workout/${wId}`;
+    }
+  };
 }
 
 // ── Init ──

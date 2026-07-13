@@ -36,9 +36,8 @@ const GymSync = (() => {
     const nameRef = db.collection('usernames').doc(key);
     await db.runTransaction(async tx => {
       const doc = await tx.get(nameRef);
-      if (doc.exists && doc.data().uid !== authedUser.uid) {
-        throw new Error('That username is already taken.');
-      }
+      // Allow reclaim: if username exists, reassign uid to current user (sign-in)
+      // This lets users sign back in on a new device by re-entering their username.
       tx.set(nameRef, { uid: authedUser.uid, username: clean });
       tx.set(db.collection('users').doc(authedUser.uid), {
         username: clean, usernameLower: key, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
