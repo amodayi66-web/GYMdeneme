@@ -2,7 +2,7 @@
 // GYM — Main Application
 // ============================================================================
 const STORE='gym-planner-v5';
-let state=JSON.parse(localStorage.getItem(STORE)||'{"workouts":[],"logs":[],"volumeGoal":0,"username":"","friends":[],"exerciseNotes":{},"bodyMeasurements":[],"rpeEnabled":true,"warmupEnabled":true}');
+let state=JSON.parse(localStorage.getItem(STORE)||'{"workouts":[],"logs":[],"volumeGoal":0,"username":"","friends":[],"exerciseNotes":{},"bodyMeasurements":[]}');
 let chan='BroadcastChannel'in window?new BroadcastChannel('gym-planner'):null;
 if(chan)chan.onmessage=e=>{state=e.data;save(false);render()};
 
@@ -33,7 +33,7 @@ function updateSyncStatus(){
 }
 
 function head(title,sub){
-  return `<div class="eyebrow">TRAINING PLANNER</div><h1>${title}</h1>${sub?`<p class="intro">${sub}</p>`:''}`;
+  return `<div class="eyebrow">SIMPLE GYM APP</div><h1>${title}</h1>${sub?`<p class="intro">${sub}</p>`:''}`;
 }
 
 // ── Get next workout to start ──────────────────────────────────────────
@@ -181,10 +181,9 @@ let workoutTimer=null;
 let restTimer=null;
 let restDuration=90;
 
-function setRow(n,prevReps='',prevWeight='',prevRpe='',isWarmup=false){
-  const prevStr=prevReps?`<small class="prev-data">${prevReps}×${prevWeight}${prevRpe?' @'+prevRpe:''}</small>`:'';
-  const rpeInput=state.rpeEnabled?`<input class="rpe" placeholder="RPE" inputmode="decimal" maxlength="3" style="width:40px">`:'';
-  return `<div class="set-row ${isWarmup?'warmup':''}"><span>${String(n).padStart(2,'0')}</span><input class="reps" placeholder="0" inputmode="numeric" value="${prevReps}"><input class="weight" placeholder="opt" inputmode="decimal" value="${prevWeight}"><span>kg</span>${rpeInput}${prevStr}</div>`;
+function setRow(n,prevReps='',prevWeight='',isWarmup=false){
+  const prevStr=prevReps?`<small class="prev-data">${prevReps}×${prevWeight}</small>`:'';
+  return `<div class="set-row ${isWarmup?'warmup':''}"><span>${String(n).padStart(2,'0')}</span><input class="reps" placeholder="0" inputmode="numeric" value="${prevReps}"><input class="weight" placeholder="opt" inputmode="decimal" value="${prevWeight}"><span>kg</span>${prevStr}</div>`;
 }
 
 function log(id){
@@ -204,9 +203,6 @@ function log(id){
     <div class="timer-label">WORKOUT DURATION</div>
     <div class="timer-display" id="workout-timer">00:00</div>
   </div>
-  
-  <!-- Warm-up toggle -->
-  <label class="toggle-label" style="display:inline-flex;align-items:center;gap:6px;font:10px 'DM Mono',monospace;cursor:pointer;margin-bottom:12px;padding:8px 12px;border:var(--line);background:var(--paper)"><input type="checkbox" id="toggle-warmup" ${state.warmupEnabled?'checked':''} style="width:16px;height:16px;cursor:pointer"> Warm-up sets</label>
   
   <!-- Rest Timer -->
   <div class="timer-section" style="background:var(--lilac)">
@@ -234,12 +230,12 @@ function log(id){
     const noteHtml=note?`<div class="exercise-note">📝 ${esc(note)}</div>`:'';
     const swapEx=getSimilarExercises(x);
     const swapHtml=swapEx.length?`<div class="swap-section"><button class="swap-btn" data-swap="${x}">↔ Swap</button><div class="swap-options" id="swap-${x}" style="display:none">${swapEx.map(s=>`<button class="swap-option" data-swap-from="${x}" data-swap-to="${s.id}">${esc(s.name)}</button>`).join('')}</div></div>`:'';
-    const warmupSets=state.warmupEnabled?`<div class="warmup-section"><button class="toggle-warmup" data-exercise="${x}">+ Warm-up sets</button><div class="warmup-sets" id="warmup-${x}" style="display:none"></div></div>`:'';
+    const warmupSets=`<div class="warmup-section"><button class="toggle-warmup" data-exercise="${x}">+ Warm-up sets</button><div class="warmup-sets" id="warmup-${x}" style="display:none"></div></div>`;
     const prevSetsData=getPreviousSets(x);
-    const row1=prevSetsData&&prevSetsData.sets[0]?setRow(1,prevSetsData.sets[0].reps,prevSetsData.sets[0].weight,prevSetsData.sets[0].rpe):setRow(1);
-    const row2=prevSetsData&&prevSetsData.sets[1]?setRow(2,prevSetsData.sets[1].reps,prevSetsData.sets[1].weight,prevSetsData.sets[1].rpe):setRow(2);
-    const row3=prevSetsData&&prevSetsData.sets[2]?setRow(3,prevSetsData.sets[2].reps,prevSetsData.sets[2].weight,prevSetsData.sets[2].rpe):setRow(3);
-    return `<article class="log-card" data-exercise="${x}"><div class="log-card-header"><h2>${e.name}</h2>${swapHtml}</div><small>${e.muscles.join(' · ')}</small>${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}<div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span>${state.rpeEnabled?'<span>RPE</span>':''}<span>Prev</span></div><div class="sets">${row1}${row2}${row3}</div><button class="add-set">+ add set</button></article>`;
+    const row1=prevSetsData&&prevSetsData.sets[0]?setRow(1,prevSetsData.sets[0].reps,prevSetsData.sets[0].weight):setRow(1);
+    const row2=prevSetsData&&prevSetsData.sets[1]?setRow(2,prevSetsData.sets[1].reps,prevSetsData.sets[1].weight):setRow(2);
+    const row3=prevSetsData&&prevSetsData.sets[2]?setRow(3,prevSetsData.sets[2].reps,prevSetsData.sets[2].weight):setRow(3);
+    return `<article class="log-card" data-exercise="${x}"><div class="log-card-header"><h2>${e.name}</h2>${swapHtml}</div><small>${e.muscles.join(' · ')}</small>${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}<div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span><span>Prev</span></div><div class="sets">${row1}${row2}${row3}</div><button class="add-set">+ add set</button></article>`;
   }).join('')}</section><aside class="totals">
     <div class="eyebrow">SESSION TOTAL</div>
     <h2>Today’s work</h2>
@@ -258,14 +254,12 @@ function readLog(){
     const exId=c.dataset.exercise;
     const sets=[...c.querySelectorAll('.set-row:not(.warmup)')].map(x=>({
       reps:+x.querySelector('.reps').value||0,
-      weight:+x.querySelector('.weight').value||0,
-      rpe:x.querySelector('.rpe')?+x.querySelector('.rpe').value||0:0
+      weight:+x.querySelector('.weight').value||0
     })).filter(x=>x.reps);
     // Also read warm-up sets
     const warmup=[...c.querySelectorAll('.set-row.warmup')].map(x=>({
       reps:+x.querySelector('.reps').value||0,
       weight:+x.querySelector('.weight').value||0,
-      rpe:x.querySelector('.rpe')?+x.querySelector('.rpe').value||0:0,
       warmup:true
     })).filter(x=>x.reps);
     r[exId]=[...warmup,...sets];
@@ -861,15 +855,6 @@ function initLog(){
     }
   };
   
-  // ── Toggle warm-up ──
-  const toggleWarmup=$('#toggle-warmup');
-  if(toggleWarmup)toggleWarmup.onchange=()=>{
-    state.warmupEnabled=toggleWarmup.checked;
-    save(false);
-    const id=location.hash.split('/')[2];
-    if(id)render();
-  };
-  
   // ── Warm-up sets toggle ──
   document.querySelectorAll('.toggle-warmup').forEach(b=>b.onclick=function(){
     const exId=this.dataset.exercise;
@@ -892,7 +877,7 @@ function initLog(){
     for(let i=1;i<=3;i++){
       const warmWeight=mainWeight?Math.round((mainWeight*(0.4+i*0.15))/2.5)*2.5:0;
       const prevW=prevWarmup[i-1];
-      html+=setRow(i,prevW?prevW.reps:'',warmWeight||prevW?.weight||'',prevW?.rpe||'',true);
+      html+=setRow(i,prevW?prevW.reps:'',warmWeight||prevW?.weight||'',true);
     }
     container.innerHTML=html;
     updateTotals();
@@ -918,6 +903,43 @@ function initLog(){
         render();
       }
     }
+  });
+  
+  // ── Exercise click → show previous data + PR ──
+  document.querySelectorAll('.log-card-header h2').forEach(h2=>h2.onclick=function(){
+    const card=this.closest('.log-card');
+    if(!card)return;
+    const exId=card.dataset.exercise;
+    const ex=byId(exId);
+    if(!ex)return;
+    const prev=GymAnalytics.getPreviousExerciseData(state.logs,exId);
+    const prs=GymAnalytics.getPersonalRecords(state.logs).filter(p=>p.exerciseId===exId);
+    const allLogs=state.logs.filter(l=>l.sets&&l.sets[exId]);
+    const allSets=allLogs.flatMap(l=>l.sets[exId].filter(s=>!s.warmup));
+    const bestVolume=allSets.reduce((a,b)=>(b.reps*b.weight)>(a.reps*a.weight)?b:a,{reps:0,weight:0});
+    let html=`<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" onclick="this.remove()"><div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:400px;width:90%;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
+      <h2 style="font-size:24px;letter-spacing:-1px;margin:0 0 4px">${esc(ex.name)}</h2>
+      <p style="font:10px 'DM Mono',monospace;color:#666;margin:0 0 16px">${ex.muscles.join(' · ')}</p>`;
+    if(bestVolume.reps>0){
+      html+=`<div style="background:var(--sun);border:2px solid var(--ink);padding:12px;margin-bottom:16px"><b style="font-size:14px">🏆 Personal Record</b><br><span style="font-size:18px;font-weight:800">${bestVolume.reps} reps × ${bestVolume.weight} kg</span></div>`;
+    }
+    if(prev){
+      html+=`<div style="margin-bottom:12px"><b style="font:10px 'DM Mono',monospace">Last Session</b><br><span style="font-size:14px;font-weight:700">${prev.reps} reps × ${prev.weight} kg</span> <span style="font:9px 'DM Mono',monospace;color:#666">(${prev.date})</span></div>`;
+    }
+    if(allLogs.length>0){
+      html+=`<div><b style="font:10px 'DM Mono',monospace">All Sessions (${allLogs.length})</b><div style="max-height:200px;overflow-y:auto;margin-top:6px">`;
+      allLogs.slice().reverse().slice(0,10).forEach(l=>{
+        const sets=l.sets[exId].filter(s=>!s.warmup);
+        const vol=sets.reduce((a,s)=>a+s.reps*s.weight,0);
+        html+=`<div style="padding:6px 0;border-top:1px solid #eee;font-size:11px;display:flex;justify-content:space-between"><span>${l.date}</span><span>${sets.length} sets · ${fmt(vol)} kg</span></div>`;
+      });
+      html+=`</div></div>`;
+    }
+    html+=`<button style="margin-top:16px;border:2px solid var(--ink);background:var(--paper);padding:8px 16px;font-weight:700;cursor:pointer" onclick="this.closest('div').closest('div').remove()">Close</button>
+    </div></div>`;
+    const div=document.createElement('div');
+    div.innerHTML=html;
+    document.body.appendChild(div);
   });
   
   // ── Exercise notes ──
