@@ -9,16 +9,21 @@
 .friend-chip{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--ink);background:var(--sun);padding:6px 10px;font:11px 'DM Mono',monospace;font-weight:700}
 .friend-chip .remove{border:0;background:none;font-size:16px;cursor:pointer;padding:0;line-height:1;color:var(--ink)}
 .friend-summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
-.friend-card{border:var(--line);box-shadow:var(--shadow);background:#fff;padding:18px}
-.friend-card-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
-.friend-card-header h3{font-size:18px;letter-spacing:-.5px;margin:0}
-.friend-stats{font:10px 'DM Mono',monospace;color:#666}
-.friend-workout{border-top:2px solid var(--ink);padding:10px 0}
-.friend-workout-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:4px;flex-wrap:wrap}
-.friend-workout-head b{font-size:13px}
-.friend-workout-head span{font:10px 'DM Mono',monospace;color:#666}
+.friend-card{border:var(--line);box-shadow:var(--shadow);background:#fff;padding:14px}
+.friend-card-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.friend-card-header h3{font-size:18px;letter-spacing:-.5px;margin:0 0 4px}
+.friend-stats{font:10px 'DM Mono',monospace;color:#666;line-height:1.6}
+.friend-stats b{font-weight:800;color:var(--ink)}
+.friend-toggle{border:2px solid var(--ink);background:var(--mint);padding:6px 10px;font:9px 'DM Mono',monospace;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.friend-toggle:hover{background:var(--sun)}
+.friend-workouts{border-top:2px solid var(--ink);margin-top:10px;padding-top:8px}
+.friend-workout{padding:8px 0;border-top:1px solid #eee;font-size:12px}
+.friend-workout:first-child{border-top:0;padding-top:0}
+.friend-workout-head{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:11px;flex-wrap:wrap}
+.friend-workout-head span:last-child{font:9px 'DM Mono',monospace;color:#666}
 .friend-workout-exs{display:flex;flex-wrap:wrap;gap:4px}
-.friend-ex{display:inline-block;background:var(--lilac);border:1px solid var(--ink);padding:2px 6px;font:9px 'DM Mono',monospace}
+.friend-ex{display:inline-flex;gap:4px;background:var(--lilac);border:1px solid var(--ink);padding:3px 7px;font:9px 'DM Mono',monospace;align-items:baseline}
+.friend-ex em{font-style:normal;font-weight:700}
 
 /* ── Timer Styles ─────────────────────────────────────────────────────── */
 .timer-section{border:var(--line);background:var(--sun);padding:14px;margin-bottom:16px}.timer-display{font:800 28px 'DM Mono',monospace;text-align:center;letter-spacing:2px;margin:8px 0}.timer-label{font:9px 'DM Mono',monospace;text-align:center;text-transform:uppercase}.rest-options{display:flex;gap:6px;justify-content:center;margin:10px 0}.rest-options button{border:2px solid var(--ink);background:#fff;padding:6px 10px;font:10px 'DM Mono',monospace;font-weight:700}.rest-options button.active{background:var(--ink);color:#fff}.rest-status{text-align:center;font:800 18px 'DM Mono',monospace;padding:8px;margin-top:6px}.rest-status.ready{background:var(--mint)}.rest-status.resting{background:var(--orange);color:#fff}.rest-status.go{background:var(--ink);color:#fff;animation:pulse .5s ease-in-out 3}@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}

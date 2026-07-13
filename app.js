@@ -1088,6 +1088,21 @@ function initSocial(){
     setTimeout(loadFriendFeed,50);
   };
   
+  // ── Friend toggle delegation ──
+  const feed=$('#friend-feed');
+  if(feed)feed.onclick=function(e){
+    const toggle=e.target.closest('.friend-toggle');
+    if(!toggle)return;
+    const card=toggle.closest('.friend-card');
+    if(!card)return;
+    const body=card.querySelector('.friend-workouts');
+    if(body){
+      const shown=body.style.display!=='none';
+      body.style.display=shown?'none':'block';
+      toggle.textContent=shown?'Show workouts ▾':'Hide workouts ▴';
+    }
+  };
+  
   // ── Load feed ──
   loadFriendFeed();
 }
@@ -1109,29 +1124,50 @@ async function loadFriendFeed(){
       const totalVol=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((v,s)=>v+s.reps*s.weight,0),0);
       const totalSets=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0);
       const sessionCount=workingLogs.length;
+      const uid=friendData?.uid||friendName;
+      const cardId='fc-'+uid.replace(/[^a-zA-Z0-9]/g,'');
       
-      let html=`<div class="friend-card">
+      let html=`<div class="friend-card" id="${cardId}">
         <div class="friend-card-header">
-          <h3>${esc(friendName)}</h3>
-          <span class="friend-stats">${sessionCount} sessions · ${fmt(totalSets)} sets · ${fmt(totalVol)} kg</span>
+          <div><h3>${esc(friendName)}</h3>
+          <div class="friend-stats"><b>${sessionCount}</b> sessions · <b>${fmt(totalSets)}</b> sets · <b>${fmt(totalVol)} kg</b></div></div>
+          <button class="friend-toggle" data-target="${cardId}">${workingLogs.length?'Show workouts ▾':'No workouts'}</button>
         </div>`;
       
       if(workingLogs.length){
-        const recent=workingLogs.slice(-3).reverse();
-        recent.forEach(l=>{
+        html+=`<div class="friend-workouts" style="display:none">`;
+        workingLogs.slice().reverse().forEach(l=>{
           const wName=workouts.find(w=>w.id===l.workout)?.name||'Workout';
           const allWorkSets=Object.entries(l.sets||{}).flatMap(([exId,sets])=>sets.filter(s=>!s.warmup).map(s=>({...s,exId})));
           const vol=allWorkSets.reduce((a,s)=>a+s.reps*s.weight,0);
           html+=`<div class="friend-workout">
-            <div class="friend-workout-head"><b>${esc(wName)}</b> <span>${l.date} · ${allWorkSets.length} sets · ${fmt(vol)} kg</span></div>
-            <div class="friend-workout-exs">${allWorkSets.slice(0,8).map(s=>{
+            <div class="friend-workout-head">
+              <span><b>${esc(wName)}</b> · ${l.date}</span>
+              <span>${allWorkSets.length} sets · ${fmt(vol)} kg</span>
+            </div>
+            <div class="friend-workout-exs">${allWorkSets.map(s=>{
               const ex=byId(s.exId);
-              return ex?`<span class="friend-ex">${esc(ex.name)} ${s.reps}×${s.weight}</span>`:'';
-            }).join(' ')}</div>
+              const name=ex?ex.name:'Unknown';
+              return `<span class="friend-ex">${esc(name)} <em>${s.reps}×${s.weight} kg</em></span>`;
+            }).join('')}</div>
           </div>`;
         });
-      } else {
-        html+=`<p class="message" style="padding:8px">No workouts synced yet.</p>`;
+        html+=`</div>`;
+        
+        // Toggle binding inline — we'll also set it below
+        setTimeout(()=>{
+          const card=document.getElementById(cardId);
+          if(!card)return;
+          const toggle=card.querySelector('.friend-toggle');
+          if(toggle)toggle.onclick=()=>{
+            const body=card.querySelector('.friend-workouts');
+            if(body){
+              const shown=body.style.display!=='none';
+              body.style.display=shown?'none':'block';
+              toggle.textContent=shown?'Show workouts ▾':'Hide workouts ▴';
+            }
+          };
+        },10);
       }
       html+=`</div>`;
       feed.innerHTML+=html;
