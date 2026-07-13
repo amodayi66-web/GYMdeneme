@@ -905,37 +905,33 @@ function initLog(){
     }
   });
   
-  // ── Exercise click → show previous data + PR ──
+  // ── Exercise click → show PR + all sessions with sets ──
   document.querySelectorAll('.log-card-header h2').forEach(h2=>h2.onclick=function(){
     const card=this.closest('.log-card');
     if(!card)return;
     const exId=card.dataset.exercise;
     const ex=byId(exId);
     if(!ex)return;
-    const prev=GymAnalytics.getPreviousExerciseData(state.logs,exId);
-    const prs=GymAnalytics.getPersonalRecords(state.logs).filter(p=>p.exerciseId===exId);
     const allLogs=state.logs.filter(l=>l.sets&&l.sets[exId]);
     const allSets=allLogs.flatMap(l=>l.sets[exId].filter(s=>!s.warmup));
     const bestVolume=allSets.reduce((a,b)=>(b.reps*b.weight)>(a.reps*a.weight)?b:a,{reps:0,weight:0});
-    let html=`<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" onclick="this.remove()"><div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:400px;width:90%;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
+    let html=`<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" onclick="this.remove()"><div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
       <h2 style="font-size:24px;letter-spacing:-1px;margin:0 0 4px">${esc(ex.name)}</h2>
       <p style="font:10px 'DM Mono',monospace;color:#666;margin:0 0 16px">${ex.muscles.join(' · ')}</p>`;
     if(bestVolume.reps>0){
       html+=`<div style="background:var(--sun);border:2px solid var(--ink);padding:12px;margin-bottom:16px"><b style="font-size:14px">🏆 Personal Record</b><br><span style="font-size:18px;font-weight:800">${bestVolume.reps} reps × ${bestVolume.weight} kg</span></div>`;
     }
-    if(prev){
-      html+=`<div style="margin-bottom:12px"><b style="font:10px 'DM Mono',monospace">Last Session</b><br><span style="font-size:14px;font-weight:700">${prev.reps} reps × ${prev.weight} kg</span> <span style="font:9px 'DM Mono',monospace;color:#666">(${prev.date})</span></div>`;
-    }
     if(allLogs.length>0){
-      html+=`<div><b style="font:10px 'DM Mono',monospace">All Sessions (${allLogs.length})</b><div style="max-height:200px;overflow-y:auto;margin-top:6px">`;
       allLogs.slice().reverse().slice(0,10).forEach(l=>{
         const sets=l.sets[exId].filter(s=>!s.warmup);
-        const vol=sets.reduce((a,s)=>a+s.reps*s.weight,0);
-        html+=`<div style="padding:6px 0;border-top:1px solid #eee;font-size:11px;display:flex;justify-content:space-between"><span>${l.date}</span><span>${sets.length} sets · ${fmt(vol)} kg</span></div>`;
+        if(!sets.length)return;
+        html+=`<div style="margin-bottom:10px;padding:8px;background:#f9f9f9;border:1px solid #eee">
+          <b style="font:9px 'DM Mono',monospace">LAST SESSION (${l.date})</b>
+          <div style="margin-top:4px">${sets.map(s=>`<span style="display:inline-block;background:var(--sun);padding:2px 6px;margin:2px;border:1px solid var(--ink);font:9px 'DM Mono',monospace">Set ${sets.indexOf(s)+1}: ${s.reps}×${s.weight} kg</span>`).join('')}</div>
+        </div>`;
       });
-      html+=`</div></div>`;
     }
-    html+=`<button style="margin-top:16px;border:2px solid var(--ink);background:var(--paper);padding:8px 16px;font-weight:700;cursor:pointer" onclick="this.closest('div').closest('div').remove()">Close</button>
+    html+=`<button style="margin-top:8px;border:2px solid var(--ink);background:var(--paper);padding:8px 16px;font-weight:700;cursor:pointer" onclick="this.closest('div').closest('div').remove()">Close</button>
     </div></div>`;
     const div=document.createElement('div');
     div.innerHTML=html;
