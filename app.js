@@ -897,7 +897,8 @@ function initLog(){
     const allLogs=state.logs.filter(l=>l.sets&&l.sets[exId]);
     const allSets=allLogs.flatMap(l=>l.sets[exId].filter(s=>!s.warmup));
     const bestVolume=allSets.reduce((a,b)=>(b.reps*b.weight)>(a.reps*a.weight)?b:a,{reps:0,weight:0});
-    let html=`<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" onclick="this.remove()"><div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto" onclick="event.stopPropagation()">
+    let html=`<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" onclick="this.remove()"><div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:440px;width:90%;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">
+      ${ex.gifUrl?`<img src="${ex.gifUrl}" alt="${esc(ex.name)}" style="width:100%;max-height:200px;object-fit:cover;border:2px solid var(--ink);margin-bottom:12px;background:#f5f5f5">`:''}
       <h2 style="font-size:24px;letter-spacing:-1px;margin:0 0 4px">${esc(ex.name)}</h2>
       <p style="font:10px 'DM Mono',monospace;color:#666;margin:0 0 16px">${ex.muscles.join(' · ')}</p>`;
     if(bestVolume.reps>0){

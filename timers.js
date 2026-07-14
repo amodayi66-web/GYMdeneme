@@ -1,8 +1,34 @@
 // ============================================================================
 // Timer Module — Workout duration timer + rest timer with beep
+// Uses WakeLock API to keep screen on and Date.now() for accurate elapsed time
 // ============================================================================
 const GymTimers = (() => {
   'use strict';
+
+  // ── Wake Lock ──────────────────────────────────────────────────────────
+  let wakeLock = null;
+
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+          wakeLock = null;
+        });
+      }
+    } catch (e) {
+      // Wake lock not supported or denied — silently fall back
+    }
+  }
+
+  async function releaseWakeLock() {
+    if (wakeLock) {
+      try {
+        await wakeLock.release();
+      } catch (e) { /* ignore */ }
+      wakeLock = null;
+    }
+  }
 
   // ── Audio Context for beep ─────────────────────────────────────────────
   let audioCtx = null;
@@ -49,6 +75,8 @@ const GymTimers = (() => {
     function start() {
       if (interval) return;
       startTime = Date.now() - elapsed;
+      // Request wake lock to keep screen on
+      requestWakeLock();
       interval = setInterval(() => {
         elapsed = Date.now() - startTime;
         if (onTick) onTick(formatDuration(elapsed));
@@ -60,6 +88,7 @@ const GymTimers = (() => {
         clearInterval(interval);
         interval = null;
       }
+      releaseWakeLock();
       return elapsed;
     }
 
@@ -95,6 +124,7 @@ const GymTimers = (() => {
     let isRunning = false;
     let isCountdown = false;
     let countdownInterval = null;
+    let restStartTime = null;
 
     function setDuration(sec) {
       duration = sec;
@@ -105,9 +135,14 @@ const GymTimers = (() => {
       remaining = duration;
       isRunning = true;
       isCountdown = false;
+      restStartTime = Date.now();
+      // Request wake lock to keep screen on during rest
+      requestWakeLock();
       tick();
       interval = setInterval(() => {
-        remaining--;
+        // Calculate remaining based on real elapsed time, not just decrementing
+        const realElapsed = Math.floor((Date.now() - restStartTime) / 1000);
+        remaining = Math.max(0, duration - realElapsed);
         tick();
         if (remaining <= 0) {
           stop();
@@ -126,6 +161,7 @@ const GymTimers = (() => {
         interval = null;
       }
       isRunning = false;
+      releaseWakeLock();
     }
 
     function startCountdown() {
