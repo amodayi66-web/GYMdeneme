@@ -163,7 +163,7 @@ function renderBuilder(){
   $('#exercise-list').innerHTML=choices.map(e=>`<button class="exercise-item ${selected.includes(e.id)?'selected':''}" data-exercise="${e.id}"><b>${e.name}</b><small>${e.category} · ${e.muscles.join(', ')}</small></button>`).join('');
   
   $('#count').textContent=selected.length;
-  $('#selected-list').innerHTML=selected.length?selected.map((x,i)=>`<li>${String(i+1).padStart(2,'0')} · ${byId(x).name}<button class="remove" data-remove="${x}">×</button></li>`).join(''):'<li>Choose exercises to begin.</li>';
+  $('#selected-list').innerHTML=selected.length?selected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-move-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-move-down="${x}" ${i===selected.length-1?'disabled':''}>▼</button></span>${String(i+1).padStart(2,'0')} · ${byId(x).name}<button class="remove" data-remove="${x}">×</button></li>`).join(''):'<li>Choose exercises to begin.</li>';
 }
 
 // ── WORKOUT DETAIL PAGE ────────────────────────────────────────────────
@@ -685,6 +685,18 @@ function bind(){
     };
     $('#selected-list').onclick=e=>{
       if(e.target.dataset.remove){selected=selected.filter(x=>x!==e.target.dataset.remove);renderBuilder();}
+      // Reorder up
+      if(e.target.dataset.moveUp){
+        const id=e.target.dataset.moveUp;
+        const idx=selected.indexOf(id);
+        if(idx>0){[selected[idx-1],selected[idx]]=[selected[idx],selected[idx-1]];renderBuilder();}
+      }
+      // Reorder down
+      if(e.target.dataset.moveDown){
+        const id=e.target.dataset.moveDown;
+        const idx=selected.indexOf(id);
+        if(idx<selected.length-1){[selected[idx],selected[idx+1]]=[selected[idx+1],selected[idx]];renderBuilder();}
+      }
     };
     $('#save-workout').onclick=()=>{
       let n=$('#workout-name').value.trim(),m=$('#message');
@@ -1307,7 +1319,7 @@ function renderEditBuilder(){
   if(ec)ec.textContent=editSelected.length;
   
   const sl=$('#edit-selected-list');
-  if(sl)sl.innerHTML=editSelected.map((x,i)=>`<li>${String(i+1).padStart(2,'0')} · ${byId(x).name}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('');
+  if(sl)sl.innerHTML=editSelected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-edit-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-edit-down="${x}" ${i===editSelected.length-1?'disabled':''}>▼</button></span>${String(i+1).padStart(2,'0')} · ${byId(x).name}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('');
 }
 
 function initEditWorkout(){
@@ -1336,6 +1348,18 @@ function initEditWorkout(){
     if(e.target.dataset.editRemove){
       editSelected=editSelected.filter(x=>x!==e.target.dataset.editRemove);
       renderEditBuilder();
+    }
+    // Reorder up
+    if(e.target.dataset.editUp){
+      const id=e.target.dataset.editUp;
+      const idx=editSelected.indexOf(id);
+      if(idx>0){[editSelected[idx-1],editSelected[idx]]=[editSelected[idx],editSelected[idx-1]];renderEditBuilder();}
+    }
+    // Reorder down
+    if(e.target.dataset.editDown){
+      const id=e.target.dataset.editDown;
+      const idx=editSelected.indexOf(id);
+      if(idx<editSelected.length-1){[editSelected[idx],editSelected[idx+1]]=[editSelected[idx+1],editSelected[idx]];renderEditBuilder();}
     }
   };
   

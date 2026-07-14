@@ -173,4 +173,4 @@ const getEquipmentTypes = () => ['Barbell','Dumbbell','Machine','Cable','Bodywei
 const getExercisesByMuscle = muscle => EX.filter(e => e.muscles.includes(muscle));
 const getExercisesByEquipment = equip => EX.filter(e => e.category === equip);
 const byId = id => EX.find(e => e.id === id);
-const byName = name => EX.find(e => e.name === name);
+const byName = name => { const e = EX.find(x => x.name === name); return e ? e.id : null; };
