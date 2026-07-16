@@ -163,7 +163,7 @@ function renderBuilder(){
   $('#exercise-list').innerHTML=choices.map(e=>`<button class="exercise-item ${selected.includes(e.id)?'selected':''}" data-exercise="${e.id}"><b>${e.name}</b><small>${e.category} · ${e.muscles.join(', ')}</small></button>`).join('');
   
   $('#count').textContent=selected.length;
-  $('#selected-list').innerHTML=selected.length?selected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-move-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-move-down="${x}" ${i===selected.length-1?'disabled':''}>▼</button></span><span class="ex-name" data-show-ex="${x}">${byId(x).name}</span><button class="remove" data-remove="${x}">×</button></li>`).join(''):'<li>Choose exercises to begin.</li>';
+  $('#selected-list').innerHTML=selected.length?selected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-move-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-move-down="${x}" ${i===selected.length-1?'disabled':''}>▼</button></span>${byId(x).name}<button class="remove" data-remove="${x}">×</button></li>`).join(''):'<li>Choose exercises to begin.</li>';
 }
 
 // ── WORKOUT DETAIL PAGE ────────────────────────────────────────────────
@@ -696,10 +696,6 @@ function bind(){
         const id=e.target.dataset.moveDown;
         const idx=selected.indexOf(id);
         if(idx<selected.length-1){[selected[idx],selected[idx+1]]=[selected[idx+1],selected[idx]];renderBuilder();}
-      }
-      // Show exercise GIF popup
-      if(e.target.dataset.showEx){
-        showExerciseGifPopup(e.target.dataset.showEx);
       }
     };
     $('#save-workout').onclick=()=>{
@@ -1259,21 +1255,6 @@ async function loadFriendFeed(){
   }
 }
 
-// ── Show exercise GIF popup (used by builder, edit, and any exercise name click) ──
-function showExerciseGifPopup(exId){
-  const ex=byId(exId);
-  if(!ex)return;
-  const html=`<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" onclick="this.remove()"><div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:440px;width:90%;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">
-    ${ex.gifUrl?`<img src="${ex.gifUrl}" alt="${esc(ex.name)}" style="width:100%;max-height:200px;object-fit:cover;border:2px solid var(--ink);margin-bottom:12px;background:#f5f5f5">`:''}
-    <h2 style="font-size:24px;letter-spacing:-1px;margin:0 0 4px">${esc(ex.name)}</h2>
-    <p style="font:10px 'DM Mono',monospace;color:#666;margin:0 0 16px">${ex.muscles.join(' · ')}</p>
-    <button style="margin-top:8px;border:2px solid var(--ink);background:var(--paper);padding:8px 16px;font-weight:700;cursor:pointer" onclick="this.closest('div[style]').parentElement.remove()">Close</button>
-  </div></div>`;
-  const div=document.createElement('div');
-  div.innerHTML=html;
-  document.body.appendChild(div);
-}
-
 // ── Render add exercise list ──
 function renderAddExerciseList(query){
   const container=$('#add-ex-list');
@@ -1301,7 +1282,7 @@ function editWorkout(id){
   </section><aside class="selection">
     <div class="eyebrow">EXERCISES IN WORKOUT</div>
     <h2><span id="edit-count">${allExIds.length}</span> exercises</h2>
-    <ol id="edit-selected-list" class="selected-list">${allExIds.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-edit-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-edit-down="${x}" ${i===allExIds.length-1?'disabled':''}>▼</button></span><span class="ex-name" data-edit-show="${x}">${byId(x).name}</span><button class="remove" data-edit-remove="${x}">×</button></li>`).join('')}</ol>
+    <ol id="edit-selected-list" class="selected-list">${allExIds.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-edit-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-edit-down="${x}" ${i===allExIds.length-1?'disabled':''}>▼</button></span>${byId(x).name}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('')}</ol>
     <button id="save-edit-workout" class="button">Save changes →</button>
     <p id="edit-message" class="message"></p>
   </aside></div>`;
@@ -1378,10 +1359,6 @@ function initEditWorkout(){
       const id=e.target.dataset.editDown;
       const idx=editSelected.indexOf(id);
       if(idx<editSelected.length-1){[editSelected[idx],editSelected[idx+1]]=[editSelected[idx+1],editSelected[idx]];renderEditBuilder();}
-    }
-    // Show exercise GIF popup
-    if(e.target.dataset.editShow){
-      showExerciseGifPopup(e.target.dataset.editShow);
     }
   };
   
