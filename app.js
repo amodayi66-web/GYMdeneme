@@ -96,7 +96,7 @@ function home(){
     <a class="button" href="#/log/${nextW.id}">Start next workout →</a>
   </div>`:''}
   <section><div class="section-head"><div><div class="eyebrow">YOUR WORKOUTS</div><h2>My plan</h2></div><a class="button mint" href="#/templates">Choose a plan →</a></div>
-  ${state.workouts.length?`<div class="workout-grid">${state.workouts.map((w,i)=>`<a href="#/workout/${w.id}" class="workout-card"><small>${String(i+1).padStart(2,'0')} / ${w.exercises.length} exercises</small><h2>${esc(w.name)}</h2><p>${w.exercises.slice(0,3).map(id=>byId(id).name).join(' · ')}${w.exercises.length>3?' · …':''}</p><div class="card-foot"><span>OPEN WORKOUT</span><span>↗</span></div></a>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
+  ${state.workouts.length?`<div class="workout-grid">${state.workouts.map((w,i)=>`<a href="#/workout/${w.id}" class="workout-card"><small>${String(i+1).padStart(2,'0')} / ${w.exercises.length} exercises</small><h2>${esc(w.name)}</h2><p>${w.exercises.slice(0,3).map(id=>{const e=byId(id);return e?e.name:'?'}).join(' · ')}${w.exercises.length>3?' · …':''}</p><div class="card-foot"><span>OPEN WORKOUT</span><span>↗</span></div></a>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
 }
 
 // ── TEMPLATES PAGE ─────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ function renderTemplates(){
   // Update filter active states
   document.querySelectorAll('#level-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.level===level));
   document.querySelectorAll('#goal-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.goal===goalFilter));
-  $('#template-grid').innerHTML=plans.map(p=>`<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${p.days.length} SESSION ROTATION</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(byName).map(id=>byId(id).name).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><button class="button" data-choose="${p.id}">Add this plan →</button></article>`).join('');
+  $('#template-grid').innerHTML=plans.map(p=>`<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${p.days.length} SESSION ROTATION</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(byName).filter(Boolean).map(id=>{const e=byId(id);return e?e.name:'?'}).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><button class="button" data-choose="${p.id}">Add this plan →</button></article>`).join('');
 }
 
 function addPlan(pid){

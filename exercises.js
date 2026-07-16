@@ -142,7 +142,19 @@ const EX = _EX_RAW.map(e => ({
 }));
 
 const byId = id => EX.find(e => e.id === id);
-const byName = name => { const e = EX.find(x => x.name === name); return e ? e.id : null; };
+const byName = name => {
+  if(!name)return null;
+  // Exact match first
+  const exact = EX.find(x => x.name === name);
+  if(exact)return exact.id;
+  // Case-insensitive match
+  const lower = name.toLowerCase();
+  const ci = EX.find(x => x.name.toLowerCase() === lower);
+  if(ci)return ci.id;
+  // Partial match (e.g. "Barbell Row" matches "Barbell Pendlay Row")
+  const partial = EX.find(x => x.name.toLowerCase().includes(lower));
+  return partial ? partial.id : null;
+};
 const getMuscleGroups = () => ['Chest','Back','Shoulders','Arms','Legs','Core'];
 const getEquipmentTypes = () => ['Barbell','Dumbbell','Machine','Cable','Bodyweight','Kettlebell','EZ Bar','Resistance Band','Trap Bar','Sled','Medicine Ball'];
 const getExercisesByMuscle = muscle => EX.filter(e => e.muscles.includes(muscle));
