@@ -114,7 +114,7 @@ function renderTemplates(){
   // Update filter active states
   document.querySelectorAll('#level-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.level===level));
   document.querySelectorAll('#goal-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.goal===goalFilter));
-  $('#template-grid').innerHTML=plans.map(p=>`<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${p.days.length} SESSION ROTATION</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(byName).filter(Boolean).map(id=>{const e=byId(id);return e?e.name:'?'}).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><button class="button" data-choose="${p.id}">Add this plan →</button></article>`).join('');
+  $('#template-grid').innerHTML=plans.map(p=>`<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${p.days.length} SESSION ROTATION</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(byName).filter(Boolean).map(id=>{const e=byId(id);return e?e.name:`?`}).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><button class="button" data-choose="${p.id}">Add this plan →</button></article>`).join('');
 }
 
 function addPlan(pid){

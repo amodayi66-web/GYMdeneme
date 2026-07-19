@@ -11,7 +11,9 @@ const URLS = [
   '/GYMdeneme/analytics.js',
   '/GYMdeneme/plans.js',
   '/GYMdeneme/firebase-config.js',
-  '/GYMdeneme/manifest.json'
+  '/GYMdeneme/manifest.json',
+  '/GYMdeneme/icons/icon-192.png',
+  '/GYMdeneme/icons/icon-512.png'
 ];
 
 self.addEventListener('install', e => {

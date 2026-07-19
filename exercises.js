@@ -132,6 +132,19 @@ const _EX_RAW = [
   ['Medicine Ball Wall Ball','Medicine Ball','Legs, Core'],
   ['Medicine Ball Russian Twist','Medicine Ball','Core'],
   ['Medicine Ball Chest Pass','Medicine Ball','Chest, Arms'],
+  ['Hanging Leg Raise','Bodyweight','Core'],
+  ['Cable Hammer Curl','Cable','Arms'],
+  ['Cable Pullover','Cable','Chest, Back'],
+  ['Lying Leg Curl','Machine','Legs'],
+  ['Hyperextension Bench','Bodyweight','Legs, Core'],
+  ['Box Jump','Bodyweight','Legs'],
+  ['Decline Push-up','Bodyweight','Chest, Arms'],
+  ['Incline Push-up','Bodyweight','Chest, Arms'],
+  ['Pec Deck Fly','Machine','Chest'],
+  ['Cable Crossover','Cable','Chest'],
+  ['Side Plank','Bodyweight','Core'],
+  ['Calf Raise Machine (Standing)','Machine','Legs'],
+  ['Calf Raise Machine (Seated)','Machine','Legs'],
 ];
 
 const EX = _EX_RAW.map(e => ({

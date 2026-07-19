@@ -62,8 +62,8 @@ const PLANS = [
     desc:'Dr. Swole\'s science-based 3 Day Full Body Powerbuilding Split. Designed for hypertrophy and strength. Train full body 3x a week using Greyskull LP progression on main lifts with RPE-based accessory work.',
     days:[
       ['Full Body A',['Barbell Back Squat','Barbell Bench Press','Barbell Lunges','Barbell Row','Dumbbell Hammer Curl','Cable Triceps Pushdown','Dumbbell Lateral Raise','Calf Raise Machine (Standing)']],
-      ['Full Body B',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Leg Press','Barbell Bench Press','Pull-up','EZ Bar Curl','Barbell Upright Row','Calf Raise Machine (Standing)']],
-      ['Full Body C',['Barbell Back Squat','Barbell Bench Press','Romanian Deadlift','Cable Row','Dumbbell Curl','EZ Bar Skull Crusher','Dumbbell Lateral Raise','Calf Raise Machine (Standing)']]
+      ['Full Body B',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Machine Leg Press','Barbell Bench Press','Pull-up','EZ Bar Curl','Barbell Upright Row','Calf Raise Machine (Standing)']],
+      ['Full Body C',['Barbell Back Squat','Barbell Bench Press','Romanian Deadlift','Cable Seated Row','Dumbbell Curl','EZ Bar Skull Crusher','Dumbbell Lateral Raise','Calf Raise Machine (Standing)']]
     ]
   },
   {
@@ -89,8 +89,8 @@ const PLANS = [
     desc:'A balanced three-day split for building muscle with focused sessions. Train 6 days/week on rotation.',
     days:[
       ['Push',['Barbell Bench Press','Overhead Press (Strict)','Dumbbell Lateral Raise','Cable Triceps Pushdown','Dumbbell Incline Press']],
-      ['Pull',['Barbell Row','Lat Pulldown','Cable Face Pull','Dumbbell Curl','Dumbbell Hammer Curl']],
-      ['Legs',['Barbell Back Squat','Romanian Deadlift','Leg Extension','Calf Raise Machine (Standing)','Hanging Leg Raise']]
+      ['Pull',['Barbell Row','Cable Lat Pulldown','Cable Face Pull','Dumbbell Curl','Dumbbell Hammer Curl']],
+      ['Legs',['Barbell Back Squat','Romanian Deadlift','Machine Leg Extension','Hanging Leg Raise','Calf Raise Machine (Standing)']]
     ]
   },
   {
@@ -101,12 +101,12 @@ const PLANS = [
     duration:'75 min · 12 weeks',
     desc:'Higher volume Push/Pull/Legs with more accessories. For those who want extra hypertrophy work.',
     days:[
-      ['Push Heavy',['Barbell Bench Press','Overhead Press (Strict)','Dumbbell Incline Press','Dumbbell Lateral Raise','Cable Triceps Pushdown','Dumbbell Overhead Triceps Extension']],
-      ['Pull Heavy',['Barbell Deadlift (Conventional)','Barbell Row','Lat Pulldown','Cable Face Pull','Dumbbell Curl','Dumbbell Hammer Curl']],
-      ['Legs Heavy',['Barbell Back Squat','Romanian Deadlift','Leg Press','Leg Extension','Seated Leg Curl','Calf Raise Machine (Standing)']],
-      ['Push Light',['Dumbbell Bench Press','Dumbbell Shoulder Press','Cable Chest Fly','Dumbbell Lateral Raise','Cable Triceps Pushdown']],
-      ['Pull Light',['Cable Row','Pull-up','Cable Reverse Fly','Cable Biceps Curl','Cable Hammer Curl']],
-      ['Legs Light',['Barbell Front Squat','Dumbbell Bulgarian Split Squat','Lying Leg Curl','Calf Raise Machine (Seated)','Plank']]
+  ['Push Heavy',['Barbell Bench Press','Overhead Press (Strict)','Dumbbell Incline Press','Dumbbell Lateral Raise','Cable Triceps Pushdown','Dumbbell Overhead Triceps Extension']],
+  ['Pull Heavy',['Barbell Deadlift (Conventional)','Barbell Row','Cable Lat Pulldown','Cable Face Pull','Dumbbell Curl','Dumbbell Hammer Curl']],
+      ['Legs Heavy',['Barbell Back Squat','Romanian Deadlift','Machine Leg Press','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Standing)']],
+  ['Push Light',['Dumbbell Bench Press','Dumbbell Shoulder Press','Cable Chest Fly','Dumbbell Lateral Raise','Cable Triceps Pushdown']],
+  ['Pull Light',['Cable Seated Row','Pull-up','Cable Rear Delt Fly','Cable Biceps Curl','Cable Hammer Curl']],
+      ['Legs Light',['Barbell Front Squat','Dumbbell Bulgarian Split Squat','Machine Leg Curl','Calf Raise Machine (Seated)','Plank']]
     ]
   },
   {
@@ -117,10 +117,10 @@ const PLANS = [
     duration:'60 min · 12 weeks',
     desc:'Classic 4-day upper/lower split. Train each muscle group twice per week for balanced growth.',
     days:[
-      ['Upper A',['Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Dumbbell Curl','Cable Triceps Pushdown']],
-      ['Lower A',['Barbell Back Squat','Romanian Deadlift','Leg Extension','Calf Raise Machine (Standing)','Hanging Leg Raise']],
-      ['Upper B',['Barbell Incline Bench Press','Lat Pulldown','Dumbbell Lateral Raise','Dumbbell Hammer Curl','Dumbbell Overhead Triceps Extension']],
-      ['Lower B',['Barbell Deadlift (Conventional)','Barbell Lunges','Seated Leg Curl','Calf Raise Machine (Seated)','Plank']]
+  ['Upper A',['Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Dumbbell Curl','Cable Triceps Pushdown']],
+  ['Lower A',['Barbell Back Squat','Romanian Deadlift','Machine Leg Extension','Hanging Leg Raise','Calf Raise Machine (Standing)']],
+  ['Upper B',['Barbell Incline Bench Press','Cable Lat Pulldown','Dumbbell Lateral Raise','Dumbbell Hammer Curl','Dumbbell Overhead Triceps Extension']],
+  ['Lower B',['Barbell Deadlift (Conventional)','Barbell Lunges','Machine Leg Curl','Calf Raise Machine (Seated)','Plank']]
     ]
   },
   {
@@ -131,10 +131,10 @@ const PLANS = [
     duration:'60 min · 12 weeks',
     desc:'The classic bodybuilding split. Each muscle group gets its own day for maximum focus and volume.',
     days:[
-      ['Chest',['Barbell Bench Press','Dumbbell Incline Press','Cable Chest Fly','Pec Deck (Chest Fly Machine)','Push-up']],
-      ['Back',['Barbell Deadlift (Conventional)','Barbell Row','Lat Pulldown','Cable Row','Pull-up']],
+      ['Chest',['Barbell Bench Press','Dumbbell Incline Press','Cable Chest Fly','Pec Deck Fly','Pushup']],
+      ['Back',['Barbell Deadlift (Conventional)','Barbell Row','Cable Lat Pulldown','Cable Seated Row','Pull-up']],
       ['Shoulders',['Overhead Press (Strict)','Dumbbell Lateral Raise','Dumbbell Front Raise','Cable Face Pull','Dumbbell Rear Delt Fly']],
-      ['Legs',['Barbell Back Squat','Leg Press','Leg Extension','Seated Leg Curl','Calf Raise Machine (Standing)']],
+      ['Legs',['Barbell Back Squat','Machine Leg Press','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Standing)']],
       ['Arms',['Barbell Curl','Dumbbell Hammer Curl','Cable Triceps Pushdown','Dumbbell Overhead Triceps Extension','EZ Bar Skull Crusher']]
     ]
   },
@@ -147,9 +147,9 @@ const PLANS = [
     desc:'Power Hypertrophy Upper Lower. Combines strength and size training in one 4-day program.',
     days:[
       ['Upper Power',['Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Barbell Curl','Cable Triceps Pushdown']],
-      ['Lower Power',['Barbell Back Squat','Barbell Deadlift (Conventional)','Leg Press','Calf Raise Machine (Standing)']],
-      ['Upper Hypertrophy',['Dumbbell Incline Press','Cable Row','Dumbbell Lateral Raise','Dumbbell Curl','Cable Overhead Triceps Extension']],
-      ['Lower Hypertrophy',['Barbell Front Squat','Romanian Deadlift','Leg Extension','Seated Leg Curl','Calf Raise Machine (Seated)']]
+      ['Lower Power',['Barbell Back Squat','Barbell Deadlift (Conventional)','Machine Leg Press','Calf Raise Machine (Standing)']],
+      ['Upper Hypertrophy',['Dumbbell Incline Press','Cable Seated Row','Dumbbell Lateral Raise','Dumbbell Curl','Cable Overhead Triceps Extension']],
+      ['Lower Hypertrophy',['Barbell Front Squat','Romanian Deadlift','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Seated)']]
     ]
   },
   {
@@ -161,9 +161,9 @@ const PLANS = [
     desc:'Layne Norton\'s PHAT. 5 days combining strength and bodybuilding for advanced intermediate lifters.',
     days:[
       ['Upper Power',['Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Pull-up','Barbell Curl']],
-      ['Lower Power',['Barbell Back Squat','Barbell Deadlift (Conventional)','Leg Press','Calf Raise Machine (Standing)']],
-      ['Back & Shoulders',['Cable Row','Lat Pulldown','Dumbbell Lateral Raise','Cable Face Pull','Dumbbell Rear Delt Fly']],
-      ['Legs Hypertrophy',['Barbell Front Squat','Romanian Deadlift','Leg Extension','Seated Leg Curl','Calf Raise Machine (Seated)']],
+      ['Lower Power',['Barbell Back Squat','Barbell Deadlift (Conventional)','Machine Leg Press','Calf Raise Machine (Standing)']],
+      ['Back & Shoulders',['Cable Seated Row','Cable Lat Pulldown','Dumbbell Lateral Raise','Cable Face Pull','Dumbbell Rear Delt Fly']],
+      ['Legs Hypertrophy',['Barbell Front Squat','Romanian Deadlift','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Seated)']],
       ['Chest & Arms',['Dumbbell Bench Press','Dumbbell Incline Press','Cable Chest Fly','Dumbbell Curl','Cable Triceps Pushdown']]
     ]
   },
@@ -175,9 +175,9 @@ const PLANS = [
     duration:'60 min · 14 weeks',
     desc:'Four rotating sessions using heavy, volume, and accessory work. Cody LeFever\'s popular method.',
     days:[
-      ['A1 · Squat',['Barbell Back Squat','Barbell Bench Press','Lat Pulldown','Dumbbell Lateral Raise','Plank']],
+      ['A1 · Squat',['Barbell Back Squat','Barbell Bench Press','Cable Lat Pulldown','Dumbbell Lateral Raise','Plank']],
       ['B1 · Press',['Overhead Press (Strict)','Barbell Deadlift (Conventional)','Dumbbell Row','Dumbbell Curl','Hanging Leg Raise']],
-      ['A2 · Bench',['Barbell Bench Press','Barbell Back Squat','Cable Row','Cable Triceps Pushdown','Plank']],
+      ['A2 · Bench',['Barbell Bench Press','Barbell Back Squat','Cable Seated Row','Cable Triceps Pushdown','Plank']],
       ['B2 · Deadlift',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Cable Face Pull','Dumbbell Hammer Curl','Hanging Leg Raise']]
     ]
   },
@@ -190,9 +190,9 @@ const PLANS = [
     desc:'High volume linear progression based on the Sheiko-inspired 5/3/1 variant. Lots of heavy sets.',
     days:[
       ['Bench Heavy',['Barbell Bench Press','Overhead Press (Strict)','Dumbbell Row','Dumbbell Lateral Raise','Cable Triceps Pushdown']],
-      ['Squat Heavy',['Barbell Back Squat','Barbell Sumo Deadlift','Leg Press','Leg Extension','Hanging Leg Raise']],
-      ['OHP Heavy',['Overhead Press (Strict)','Barbell Incline Bench Press','Lat Pulldown','Dumbbell Curl','Cable Face Pull']],
-      ['Deadlift Heavy',['Barbell Deadlift (Conventional)','Barbell Front Squat','Cable Row','Calf Raise Machine (Standing)','Plank']]
+      ['Squat Heavy',['Barbell Back Squat','Barbell Sumo Deadlift','Machine Leg Press','Machine Leg Extension','Hanging Leg Raise']],
+      ['OHP Heavy',['Overhead Press (Strict)','Barbell Incline Bench Press','Cable Lat Pulldown','Dumbbell Curl','Cable Face Pull']],
+      ['Deadlift Heavy',['Barbell Deadlift (Conventional)','Barbell Front Squat','Cable Seated Row','Calf Raise Machine (Standing)','Plank']]
     ]
   },
 
@@ -205,9 +205,9 @@ const PLANS = [
     duration:'60 min · 16 weeks',
     desc:'Jim Wendler\'s 5/3/1 with BBB. Main work followed by 5×10 accessories for massive size gains.',
     days:[
-      ['Squat 5/3/1',['Barbell Back Squat','Leg Press','Leg Extension','Seated Leg Curl','Calf Raise Machine (Standing)']],
+      ['Squat 5/3/1',['Barbell Back Squat','Machine Leg Press','Machine Leg Extension','Machine Leg Curl','Hanging Leg Raise']],
       ['Bench 5/3/1',['Barbell Bench Press','Dumbbell Bench Press','Cable Chest Fly','Cable Triceps Pushdown','Dumbbell Curl']],
-      ['Deadlift 5/3/1',['Barbell Deadlift (Conventional)','Barbell Hip Thrust','Barbell Row','Lat Pulldown','Hanging Leg Raise']],
+      ['Deadlift 5/3/1',['Barbell Deadlift (Conventional)','Barbell Hip Thrust','Barbell Row','Cable Lat Pulldown','Hanging Leg Raise']],
       ['OHP 5/3/1',['Overhead Press (Strict)','Dumbbell Shoulder Press','Dumbbell Lateral Raise','Cable Face Pull','Dumbbell Hammer Curl']]
     ]
   },
@@ -222,7 +222,7 @@ const PLANS = [
       ['Press Day',['Overhead Press (Strict)','Dumbbell Bench Press','Dumbbell Lateral Raise','Cable Triceps Pushdown','Pull-up']],
       ['Deadlift Day',['Barbell Deadlift (Conventional)','Barbell Back Squat','Barbell Hip Thrust','Hanging Leg Raise','Plank']],
       ['Bench Day',['Barbell Bench Press','Dumbbell Incline Press','Cable Chest Fly','Dumbbell Curl','Cable Triceps Pushdown']],
-      ['Squat Day',['Barbell Back Squat','Leg Press','Romanian Deadlift','Calf Raise Machine (Standing)','Hanging Leg Raise']]
+      ['Squat Day',['Barbell Back Squat','Machine Leg Press','Romanian Deadlift','Hanging Leg Raise']]
     ]
   },
   {
@@ -233,10 +233,10 @@ const PLANS = [
     duration:'90 min · 13 weeks',
     desc:'The infamous Smolov squat program. Extremely high volume and frequency. For experienced lifters only.',
     days:[
-      ['Squat Heavy',['Barbell Back Squat','Leg Press','Leg Extension','Calf Raise Machine (Standing)']],
-      ['Squat Volume',['Barbell Back Squat','Barbell Front Squat','Leg Press','Hanging Leg Raise']],
-      ['Squat Light',['Barbell Back Squat','Leg Extension','Seated Leg Curl','Plank']],
-      ['Squat Medium',['Barbell Back Squat','Barbell Lunges','Calf Raise Machine (Seated)','Hanging Leg Raise']]
+      ['Squat Heavy',['Barbell Back Squat','Machine Leg Press','Machine Leg Extension','Hanging Leg Raise']],
+      ['Squat Volume',['Barbell Back Squat','Barbell Front Squat','Machine Leg Press','Hanging Leg Raise']],
+      ['Squat Light',['Barbell Back Squat','Machine Leg Extension','Machine Leg Curl','Plank']],
+      ['Squat Medium',['Barbell Back Squat','Barbell Lunges','Hanging Leg Raise']]
     ]
   },
   {
@@ -247,9 +247,9 @@ const PLANS = [
     duration:'75 min · 16 weeks',
     desc:'Chad Wesley Smith\'s Juggernaut. 4 waves of 10s, 8s, 5s, 3s for long-term strength progression.',
     days:[
-      ['Squat Wave',['Barbell Back Squat','Leg Press','Romanian Deadlift','Calf Raise Machine (Standing)','Plank']],
+      ['Squat Wave',['Barbell Back Squat','Machine Leg Press','Romanian Deadlift','Plank']],
       ['Bench Wave',['Barbell Bench Press','Dumbbell Incline Press','Cable Chest Fly','Cable Triceps Pushdown','Dumbbell Curl']],
-      ['Deadlift Wave',['Barbell Deadlift (Conventional)','Barbell Row','Lat Pulldown','Barbell Hip Thrust','Hanging Leg Raise']],
+      ['Deadlift Wave',['Barbell Deadlift (Conventional)','Barbell Row','Cable Lat Pulldown','Barbell Hip Thrust','Hanging Leg Raise']],
       ['Press Wave',['Overhead Press (Strict)','Dumbbell Shoulder Press','Dumbbell Lateral Raise','Cable Face Pull','Dumbbell Hammer Curl']]
     ]
   },
@@ -261,10 +261,10 @@ const PLANS = [
     duration:'90 min · 12 weeks',
     desc:'Boris Sheiko\'s advanced powerlifting program. High frequency, high volume for competition prep.',
     days:[
-      ['Bench & Squat',['Barbell Bench Press','Barbell Back Squat','Dumbbell Bench Press','Leg Extension','Plank']],
-      ['Deadlift & Press',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Barbell Row','Cable Row','Hanging Leg Raise']],
-      ['Squat & Bench',['Barbell Back Squat','Barbell Bench Press','Leg Press','Cable Triceps Pushdown','Dumbbell Curl']],
-      ['Deadlift & Squat',['Barbell Deadlift (Conventional)','Barbell Front Squat','Lat Pulldown','Calf Raise Machine (Standing)','Plank']]
+      ['Bench & Squat',['Barbell Bench Press','Barbell Back Squat','Dumbbell Bench Press','Machine Leg Extension','Plank']],
+      ['Deadlift & Press',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Barbell Row','Cable Seated Row','Hanging Leg Raise']],
+      ['Squat & Bench',['Barbell Back Squat','Barbell Bench Press','Machine Leg Press','Cable Triceps Pushdown','Dumbbell Curl']],
+      ['Deadlift & Squat',['Barbell Deadlift (Conventional)','Barbell Front Squat','Cable Lat Pulldown','Hanging Leg Raise','Plank']]
     ]
   },
   {
@@ -276,9 +276,9 @@ const PLANS = [
     desc:'The Conjugate Method from Westside Barbell. Max effort and dynamic effort days for elite strength.',
     days:[
       ['Max Effort Upper',['Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Dumbbell Curl','Cable Triceps Pushdown']],
-      ['Max Effort Lower',['Barbell Back Squat','Barbell Deadlift (Conventional)','Leg Press','Calf Raise Machine (Standing)','Hanging Leg Raise']],
-      ['Dynamic Effort Upper',['Dumbbell Bench Press','Cable Row','Dumbbell Lateral Raise','Dumbbell Hammer Curl','Cable Overhead Triceps Extension']],
-      ['Dynamic Effort Lower',['Barbell Front Squat','Barbell Sumo Deadlift','Leg Extension','Seated Leg Curl','Plank']]
+      ['Max Effort Lower',['Barbell Back Squat','Barbell Deadlift (Conventional)','Machine Leg Press','Hanging Leg Raise']],
+      ['Dynamic Effort Upper',['Dumbbell Bench Press','Cable Seated Row','Dumbbell Lateral Raise','Dumbbell Hammer Curl','Cable Overhead Triceps Extension']],
+      ['Dynamic Effort Lower',['Barbell Front Squat','Barbell Sumo Deadlift','Machine Leg Extension','Machine Leg Curl','Plank']]
     ]
   },
   {
@@ -290,7 +290,7 @@ const PLANS = [
     desc:'Dr. Swole\'s advanced full body program. Higher intensity and volume for experienced lifters.',
     days:[
       ['Full Body Power',['Barbell Back Squat','Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Barbell Deadlift (Conventional)']],
-      ['Full Body Hypertrophy',['Barbell Front Squat','Dumbbell Incline Press','Lat Pulldown','Dumbbell Lateral Raise','Dumbbell Curl','Cable Triceps Pushdown']],
+      ['Full Body Hypertrophy',['Barbell Front Squat','Dumbbell Incline Press','Cable Lat Pulldown','Dumbbell Lateral Raise','Dumbbell Curl','Cable Triceps Pushdown']],
       ['Full Body Strength',['Barbell Deadlift (Conventional)','Barbell Incline Bench Press','Barbell Row','Dumbbell Shoulder Press','Hanging Leg Raise']]
     ]
   },
@@ -336,12 +336,12 @@ const PLANS = [
     duration:'75 min · 8 weeks',
     desc:'Inspired by Arnold Schwarzenegger\'s classic bodybuilding split. High volume, double-split training.',
     days:[
-      ['Chest & Back',['Barbell Bench Press','Barbell Row','Dumbbell Incline Press','Lat Pulldown','Cable Chest Fly','Pull-up']],
+      ['Chest & Back',['Barbell Bench Press','Barbell Row','Dumbbell Incline Press','Cable Lat Pulldown','Cable Chest Fly','Pull-up']],
       ['Shoulders & Arms',['Overhead Press (Strict)','Dumbbell Lateral Raise','Barbell Curl','Cable Triceps Pushdown','Dumbbell Hammer Curl','Dumbbell Rear Delt Fly']],
-      ['Chest & Back',['Dumbbell Bench Press','Cable Row','Barbell Incline Bench Press','Cable Face Pull','Pec Deck (Chest Fly Machine)','Australian Row (Inverted Row)']],
+      ['Chest & Back',['Dumbbell Bench Press','Cable Seated Row','Barbell Incline Bench Press','Cable Face Pull','Pec Deck Fly','Inverted Row']],
       ['Shoulders & Arms',['Dumbbell Shoulder Press','Cable Lateral Raise','EZ Bar Curl','EZ Bar Skull Crusher','Dumbbell Concentration Curl','Dumbbell Overhead Triceps Extension']],
-      ['Legs',['Barbell Back Squat','Leg Press','Romanian Deadlift','Leg Extension','Seated Leg Curl','Calf Raise Machine (Standing)']],
-      ['Chest & Back',['Push-up','Barbell Pendlay Row','Decline Push-up','Cable Pullover','Dip','Barbell Shrug']]
+      ['Legs',['Barbell Back Squat','Machine Leg Press','Romanian Deadlift','Machine Leg Extension','Machine Leg Curl','Hanging Leg Raise']],
+      ['Chest & Back',['Pushup','Barbell Pendlay Row','Decline Push-up','Cable Pullover','Dip','Barbell Shrug']]
     ]
   },
 
@@ -354,10 +354,10 @@ const PLANS = [
     duration:'75 min · 8 weeks',
     desc:'10 sets of 10 reps. The classic German Volume Training method for massive hypertrophy gains.',
     days:[
-      ['Chest & Back',['Barbell Bench Press','Barbell Row','Dumbbell Incline Press','Lat Pulldown']],
-      ['Legs & Abs',['Barbell Back Squat','Leg Press','Leg Extension','Cable Crunch']],
+      ['Chest & Back',['Barbell Bench Press','Barbell Row','Dumbbell Incline Press','Cable Lat Pulldown']],
+      ['Legs & Abs',['Barbell Back Squat','Machine Leg Press','Machine Leg Extension','Cable Crunch']],
       ['Shoulders & Arms',['Overhead Press (Strict)','Barbell Curl','Cable Triceps Pushdown','Dumbbell Lateral Raise']],
-      ['Full Body',['Barbell Deadlift (Conventional)','Dumbbell Bench Press','Cable Row','Plank']]
+      ['Full Body',['Barbell Deadlift (Conventional)','Dumbbell Bench Press','Cable Seated Row','Plank']]
     ]
   },
 
@@ -370,9 +370,9 @@ const PLANS = [
     duration:'60 min · 12 weeks',
     desc:'Dante Trudel\'s DC Training. One all-out work set per exercise with rest-pause and extreme intensity.',
     days:[
-      ['A',['Barbell Back Squat','Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Barbell Deadlift (Conventional)']],
-      ['B',['Barbell Front Squat','Dumbbell Incline Press','Lat Pulldown','Dumbbell Lateral Raise','Romanian Deadlift']],
-      ['C',['Leg Press','Barbell Bench Press','Cable Row','Dumbbell Shoulder Press','Barbell Curl']]
+  ['A',['Barbell Back Squat','Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Barbell Deadlift (Conventional)']],
+  ['B',['Barbell Front Squat','Dumbbell Incline Press','Cable Lat Pulldown','Dumbbell Lateral Raise','Romanian Deadlift']],
+  ['C',['Machine Leg Press','Barbell Bench Press','Cable Seated Row','Dumbbell Shoulder Press','Barbell Curl']]
     ]
   },
 
@@ -388,7 +388,7 @@ const PLANS = [
       ['Strength A',['Barbell Back Squat','Barbell Bench Press','Barbell Row']],
       ['Conditioning',['Kettlebell Swing','Burpee','Box Jump','Sled Push','Plank']],
       ['Strength B',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Pull-up']],
-      ['Conditioning',['Kettlebell Snatch','Mountain Climber','Walking Lunge','Medicine Ball Slam','Side Plank']]
+      ['Conditioning',['Kettlebell Snatch','Mountain Climber','Lunge','Medicine Ball Slam','Plank']]
     ]
   },
 
@@ -401,9 +401,9 @@ const PLANS = [
     duration:'75 min · 10 weeks',
     desc:'The legendary Coan/Philippi deadlift program. Specialized deadlift cycle for massive pull numbers.',
     days:[
-      ['Deadlift Speed',['Barbell Deadlift (Conventional)','Barbell Row','Leg Press','Barbell Shrug']],
-      ['Deadlift Max Effort',['Barbell Sumo Deadlift','Romanian Deadlift','Lat Pulldown','Hyperextension Bench']],
-      ['Deadlift Volume',['Trap Bar Deadlift','Barbell Good Morning','Seated Leg Curl','Cable Row','Plank']]
+      ['Deadlift Speed',['Barbell Deadlift (Conventional)','Barbell Row','Machine Leg Press','Barbell Shrug']],
+      ['Deadlift Max Effort',['Barbell Sumo Deadlift','Romanian Deadlift','Cable Lat Pulldown','Hyperextension Bench']],
+      ['Deadlift Volume',['Trap Bar Deadlift','Barbell Good Morning','Machine Leg Curl','Cable Seated Row','Plank']]
     ]
   },
 
@@ -416,8 +416,8 @@ const PLANS = [
     duration:'30 min · 8 weeks',
     desc:'Mike Mentzer\'s High Intensity Training. One set to absolute failure. Minimal volume, maximum intensity.',
     days:[
-      ['Full Body 1',['Barbell Back Squat','Barbell Bench Press','Lat Pulldown','Overhead Press (Strict)','Barbell Curl','Cable Triceps Pushdown']],
-      ['Full Body 2',['Barbell Deadlift (Conventional)','Dumbbell Incline Press','Cable Row','Dumbbell Lateral Raise','Dumbbell Hammer Curl','Dumbbell Overhead Triceps Extension']]
+      ['Full Body 1',['Barbell Back Squat','Barbell Bench Press','Cable Lat Pulldown','Overhead Press (Strict)','Barbell Curl','Cable Triceps Pushdown']],
+      ['Full Body 2',['Barbell Deadlift (Conventional)','Dumbbell Incline Press','Cable Seated Row','Dumbbell Lateral Raise','Dumbbell Hammer Curl','Dumbbell Overhead Triceps Extension']]
     ]
   },
 
@@ -431,11 +431,11 @@ const PLANS = [
     desc:'Brandon Lilly\'s Cube Method. A 3-week rotating cycle of Max Effort, Rep Effort, and Dynamic Effort.',
     days:[
       ['ME Bench',['Barbell Bench Press','Dumbbell Bench Press','Cable Chest Fly','Dumbbell Curl','Cable Triceps Pushdown']],
-      ['ME Squat',['Barbell Back Squat','Leg Press','Leg Extension','Barbell Good Morning','Plank']],
-      ['ME Deadlift',['Barbell Deadlift (Conventional)','Barbell Row','Romanian Deadlift','Lat Pulldown','Hanging Leg Raise']],
-      ['RE Upper',['Barbell Incline Bench Press','Cable Row','Dumbbell Lateral Raise','Dumbbell Hammer Curl','Cable Overhead Triceps Extension']],
-      ['DE Lower',['Barbell Front Squat','Barbell Sumo Deadlift','Seated Leg Curl','Calf Raise Machine (Standing)','Hyperextension Bench']],
-      ['RE Lower',['Barbell Back Squat','Barbell Deadlift (Conventional)','Leg Press','Hanging Leg Raise']]
+      ['ME Squat',['Barbell Back Squat','Machine Leg Press','Machine Leg Extension','Barbell Good Morning','Plank']],
+      ['ME Deadlift',['Barbell Deadlift (Conventional)','Barbell Row','Romanian Deadlift','Cable Lat Pulldown','Hanging Leg Raise']],
+      ['RE Upper',['Barbell Incline Bench Press','Cable Seated Row','Dumbbell Lateral Raise','Dumbbell Hammer Curl','Cable Overhead Triceps Extension']],
+      ['DE Lower',['Barbell Front Squat','Barbell Sumo Deadlift','Machine Leg Curl','Calf Raise Machine (Standing)','Hyperextension Bench']],
+      ['RE Lower',['Barbell Back Squat','Barbell Deadlift (Conventional)','Machine Leg Press','Hanging Leg Raise']]
     ]
   },
 
@@ -449,9 +449,9 @@ const PLANS = [
     desc:'Jim Wendler\'s 5/3/1 Triumvirate. Three exercises per day: main lift, push, and pull. Simple and effective.',
     days:[
       ['Squat Day',['Barbell Back Squat','Dumbbell Bench Press','Barbell Row']],
-      ['Bench Day',['Barbell Bench Press','Dumbbell Shoulder Press','Cable Row']],
+      ['Bench Day',['Barbell Bench Press','Dumbbell Shoulder Press','Cable Seated Row']],
       ['Deadlift Day',['Barbell Deadlift (Conventional)','Barbell Hip Thrust','Pull-up']],
-      ['Press Day',['Overhead Press (Strict)','Dumbbell Incline Press','Lat Pulldown']]
+      ['Press Day',['Overhead Press (Strict)','Dumbbell Incline Press','Cable Lat Pulldown']]
     ]
   },
 
@@ -464,10 +464,10 @@ const PLANS = [
     duration:'60 min · 12 weeks',
     desc:'Jim Stoppani\'s Shortcut to Size. Uses 5-10-15-20 rep scheme for progressive overload and muscle growth.',
     days:[
-      ['Chest & Abs',['Barbell Bench Press','Dumbbell Incline Press','Cable Chest Fly','Push-up','Plank','Hanging Leg Raise']],
-      ['Back & Biceps',['Barbell Deadlift (Conventional)','Barbell Row','Lat Pulldown','Cable Row','Barbell Curl','Dumbbell Hammer Curl']],
+      ['Chest & Abs',['Barbell Bench Press','Dumbbell Incline Press','Cable Chest Fly','Pushup','Plank','Hanging Leg Raise']],
+      ['Back & Biceps',['Barbell Deadlift (Conventional)','Barbell Row','Cable Lat Pulldown','Cable Seated Row','Barbell Curl','Dumbbell Hammer Curl']],
       ['Shoulders & Abs',['Overhead Press (Strict)','Dumbbell Lateral Raise','Cable Face Pull','Dumbbell Rear Delt Fly','Cable Crunch','Side Plank']],
-      ['Legs & Abs',['Barbell Back Squat','Leg Press','Leg Extension','Seated Leg Curl','Calf Raise Machine (Standing)','Plank']],
+      ['Legs & Abs',['Barbell Back Squat','Machine Leg Press','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Standing)','Plank']],
       ['Arms',['Barbell Curl','EZ Bar Skull Crusher','Dumbbell Concentration Curl','Cable Overhead Triceps Extension','Dumbbell Hammer Curl','Cable Triceps Pushdown']]
     ]
   },
@@ -482,9 +482,9 @@ const PLANS = [
     desc:'A 4-day upper/lower program by Alex Bromley. Daily undulating periodization with heavy singles and back-off sets.',
     days:[
       ['Heavy Upper',['Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Pull-up','Dumbbell Curl']],
-      ['Heavy Lower',['Barbell Back Squat','Barbell Deadlift (Conventional)','Leg Press','Calf Raise Machine (Standing)']],
-      ['Light Upper',['Dumbbell Incline Press','Cable Row','Dumbbell Lateral Raise','Cable Triceps Pushdown','Dumbbell Hammer Curl']],
-      ['Light Lower',['Barbell Front Squat','Romanian Deadlift','Leg Extension','Seated Leg Curl','Plank']]
+      ['Heavy Lower',['Barbell Back Squat','Barbell Deadlift (Conventional)','Machine Leg Press','Calf Raise Machine (Standing)']],
+      ['Light Upper',['Dumbbell Incline Press','Cable Seated Row','Dumbbell Lateral Raise','Cable Triceps Pushdown','Dumbbell Hammer Curl']],
+      ['Light Lower',['Barbell Front Squat','Romanian Deadlift','Machine Leg Extension','Machine Leg Curl','Plank']]
     ]
   },
 
@@ -512,9 +512,9 @@ const PLANS = [
     desc:'Hany Rambod\'s FST-7. 7 sets of 15 reps on the final exercise of each body part. Extreme pump and stretch.',
     days:[
       ['Chest & Triceps',['Barbell Bench Press','Dumbbell Incline Press','Cable Chest Fly','Cable Triceps Pushdown','EZ Bar Skull Crusher']],
-      ['Back',['Barbell Deadlift (Conventional)','Barbell Row','Lat Pulldown','Cable Row','Pull-up']],
+      ['Back',['Barbell Deadlift (Conventional)','Barbell Row','Cable Lat Pulldown','Cable Seated Row','Pull-up']],
       ['Shoulders & Biceps',['Overhead Press (Strict)','Dumbbell Lateral Raise','Cable Face Pull','Barbell Curl','Dumbbell Hammer Curl']],
-      ['Legs',['Barbell Back Squat','Leg Press','Leg Extension','Seated Leg Curl','Calf Raise Machine (Standing)']]
+      ['Legs',['Barbell Back Squat','Machine Leg Press','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Standing)']]
     ]
   },
 
@@ -528,10 +528,10 @@ const PLANS = [
     desc:'A 5-day hybrid of PPL and Upper/Lower. High frequency for maximum growth. Very popular in the fitness community.',
     days:[
       ['Push',['Barbell Bench Press','Overhead Press (Strict)','Dumbbell Incline Press','Dumbbell Lateral Raise','Cable Triceps Pushdown','Cable Chest Fly']],
-      ['Pull',['Barbell Deadlift (Conventional)','Barbell Row','Lat Pulldown','Cable Face Pull','Dumbbell Curl','Dumbbell Hammer Curl']],
-      ['Legs',['Barbell Back Squat','Romanian Deadlift','Leg Press','Leg Extension','Seated Leg Curl','Calf Raise Machine (Standing)']],
+      ['Pull',['Barbell Deadlift (Conventional)','Barbell Row','Cable Lat Pulldown','Cable Face Pull','Dumbbell Curl','Dumbbell Hammer Curl']],
+      ['Legs',['Barbell Back Squat','Romanian Deadlift','Machine Leg Press','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Standing)']],
       ['Upper',['Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Pull-up','Dumbbell Curl','Cable Triceps Pushdown']],
-      ['Lower',['Barbell Front Squat','Barbell Hip Thrust','Leg Extension','Lying Leg Curl','Calf Raise Machine (Seated)','Plank']]
+      ['Lower',['Barbell Front Squat','Barbell Hip Thrust','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Seated)','Plank']]
     ]
   },
 
@@ -547,7 +547,7 @@ const PLANS = [
       ['Squat & Bench',['Barbell Back Squat','Barbell Bench Press','Dumbbell Row','Dumbbell Curl','Plank']],
       ['Deadlift & Press',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Pull-up','Cable Face Pull','Hanging Leg Raise']],
       ['Squat & Bench',['Barbell Back Squat','Barbell Bench Press','Barbell Row','Dumbbell Hammer Curl','Plank']],
-      ['Deadlift & Press',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Lat Pulldown','Dumbbell Lateral Raise','Cable Triceps Pushdown']]
+      ['Deadlift & Press',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Cable Lat Pulldown','Dumbbell Lateral Raise','Cable Triceps Pushdown']]
     ]
   }
 ];
