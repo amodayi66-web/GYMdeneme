@@ -425,7 +425,19 @@ function summary(id){
 
 let progressTab='overview';
 function progress(){
-  return `<div class="progress-head">${head('Your progress.','Track your volume, records, and weekly trends.')}</div>
+  // Check sync status for sync button
+  const isSignedIn=GymSync.isSignedIn();
+  const isConfigured=GymSync.isConfigured();
+  const syncStatus=GymSync.getSyncStatus();
+  let syncBtnHtml='';
+  if(isConfigured&&isSignedIn){
+    if(syncStatus&&syncStatus.ok&&syncStatus.time){
+      syncBtnHtml=`<button class="button small white" id="sync-now-btn">☁ Sync now</button>`;
+    } else {
+      syncBtnHtml=`<button class="button small white" id="sync-now-btn" style="background:var(--sun)">⏳ Sync now</button>`;
+    }
+  }
+  return `<div class="progress-head" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">${head('Your progress.','Track your volume, records, and weekly trends.')}<div id="sync-progress-area">${syncBtnHtml}</div></div>
   <div class="progress-tabs">
     <button class="progress-tab ${progressTab==='overview'?'active':''}" data-tab="overview">Overview</button>
     <button class="progress-tab ${progressTab==='weekly'?'active':''}" data-tab="weekly">Weekly Report</button>
@@ -646,6 +658,22 @@ function initProgress(){
     state.bodyMeasurements.push({date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),weight:weight?+weight:null,bodyFat:bodyFat?+bodyFat:null,waist:waist?+waist:null,chest:chest?+chest:null,arms:arms?+arms:null,thighs:thighs?+thighs:null});
     save();msg.textContent='Saved!';setTimeout(()=>render(),500);
   };
+  // Sync now button
+  const syncBtn=$('#sync-now-btn');
+  if(syncBtn)syncBtn.onclick=async function(){
+    this.textContent='☁ Syncing...';
+    this.style.background='var(--sun)';
+    try{
+      await GymSync.pushState(state);
+      this.textContent='☁ Synced!';
+      this.style.background='var(--mint)';
+      setTimeout(()=>{this.textContent='☁ Sync now';this.style.background='';},2000);
+    }catch(e){
+      this.textContent='☁ Failed!';
+      this.style.background='var(--orange)';
+      setTimeout(()=>{this.textContent='☁ Sync now';this.style.background='';},2000);
+    }
+  };
 }
 
 function initLog(){
@@ -665,7 +693,7 @@ function initLog(){
     if(!val||parseFloat(val)<=0)return;
     const allWeights=card.querySelectorAll('.set-row:not(.warmup) .weight');
     const setIdx=[...allWeights].indexOf(firstWeightInput);
-    if(setIdx!==0)return; // Only auto-fill from set 1
+    if(setIdx!==0)return;
     allWeights.forEach((w,i)=>{if(i>0&&!w.value)w.value=val;});
   }
   
@@ -730,9 +758,8 @@ function initLog(){
     list.querySelectorAll('.swap-option').forEach(btn=>{btn.onclick=function(){
       const from=this.dataset.swapFrom, to=this.dataset.swapTo;
       const wid=getWid(); const w=state.workouts.find(x=>x.id===wid);
-      if(w){const idx=w.exercises.findIndex(x=>getExId(x)===from);if(idx!==-1){w.exercises[idx]=to;save();initLog();}}
-    };});
-  }
+      if(w){const idx=w.exercises.findIndex(x=>getExId(x)===from);if(idx!==-1){w.exercises[idx]=to;save();render();}} // Use render() not initLog()
+    };});}
   
   document.querySelectorAll('.log-card').forEach(card=>{
     const exId=card.dataset.exercise;
@@ -794,7 +821,14 @@ function initLog(){
   
   document.querySelectorAll('.swap-search').forEach(inp=>{inp.oninput=function(){const card=this.closest('.log-card');if(!card)return;renderSwapOptions(card, card.dataset.exercise, this.value);};});
   
-  document.querySelectorAll('.remove-superset').forEach(btn=>{btn.onclick=function(){const exId=this.dataset.exercise;const card=document.querySelector(`.log-card[data-exercise="${exId}"]`);if(card){card.style.borderRight='';card.querySelector('.superset-group').style.display='none';}};});
+  // ── Fix: use event delegation for remove-superset (dynamic elements) ──
+  document.querySelector('#log-section')?.addEventListener('click', function(e){
+    const btn=e.target.closest('.remove-superset');
+    if(!btn)return;
+    const exId=btn.dataset.exercise;
+    const card=document.querySelector(`.log-card[data-exercise="${exId}"]`);
+    if(card){card.style.borderRight='';card.querySelector('.superset-group').style.display='none';}
+  });
   
   document.querySelectorAll('[data-rest]').forEach(b=>b.onclick=function(){restDuration=+this.dataset.rest;document.querySelectorAll('[data-rest]').forEach(x=>x.classList.remove('active'));this.classList.add('active');if(restTimer){restTimer.setDuration(restDuration);restTimer.reset();updateRestUI();}});
   
@@ -836,9 +870,12 @@ function initLog(){
     const div=document.createElement('div'); div.innerHTML=html; document.body.appendChild(div);
   });
   
+  // ── Fix: only add note buttons if not already present ──
   document.querySelectorAll('.log-card').forEach(card=>{
     const exId=card.dataset.exercise, header=card.querySelector('.log-card-header');
     if(!header||!exId)return;
+    // Skip if note button already exists
+    if(header.querySelector('.note-btn'))return;
     const note=getExerciseNote(exId);
     const noteBtn=document.createElement('button'); noteBtn.className='note-btn'; noteBtn.textContent='📝'; noteBtn.title=note||'Add note';
     noteBtn.style.cssText='border:0;background:none;font-size:16px;cursor:pointer;padding:0 2px;margin-left:2px';
@@ -854,7 +891,7 @@ function initLog(){
   const addExBtn=$('#add-exercise-btn'), addExPanel=$('#add-exercise-panel');
   if(addExBtn&&addExPanel){addExBtn.onclick=()=>{const shown=addExPanel.style.display!=='none';addExPanel.style.display=shown?'none':'block';if(!shown)renderAddExerciseList('');};}
   const addExSearch=$('#add-ex-search'); if(addExSearch)addExSearch.oninput=function(){renderAddExerciseList(this.value);};
-  const addExList=$('#add-ex-list'); if(addExList){addExList.onclick=function(e){const btn=e.target.closest('[data-add-ex]');if(!btn)return;const exId=btn.dataset.addEx;if(!byId(exId))return;const wid=getWid();const w=state.workouts.find(x=>x.id===wid);if(w){w.exercises.push(exId);save();initLog();}};}
+  const addExList=$('#add-ex-list'); if(addExList){addExList.onclick=function(e){const btn=e.target.closest('[data-add-ex]');if(!btn)return;const exId=btn.dataset.addEx;if(!byId(exId))return;const wid=getWid();const w=state.workouts.find(x=>x.id===wid);if(w){w.exercises.push(exId);save();render();}};} // Use render() not initLog()
   
   const finish=$('[data-finish]');
   if(finish)finish.onclick=()=>{
@@ -872,7 +909,7 @@ function initLog(){
 
 function initSocial(){
   const setBtn=$('#set-username-btn');
-  if(setBtn)setBtn.onclick=async()=>{const input=$('#username-input'), msg=$('#username-msg');if(!input||!msg)return;const name=input.value.trim();if(!name)return msg.textContent='Enter a username.';try{const profile=await GymSync.claimUsername(name);state.username=profile.username;save();msg.textContent=`Signed in as ${profile.username}!`;msg.style.color='var(--ink)';await GymSync.pushState(state);setTimeout(()=>render(),800);}catch(e){msg.textContent=e.message;msg.style.color='#c00';}};
+  if(setBtn)setBtn.onclick=async()=>{const input=$('#username-input'), msg=$('#username-msg');if(!input||!msg)return;const name=input.value.trim();if(!name)return msg.textContent='Enter a username.';try{const profile=await GymSync.claimUsername(name);state.username=profile.username;save();msg.textContent=`Signed in as${profile.username}!`;msg.style.color='var(--ink)';await GymSync.pushState(state);setTimeout(()=>render(),800);}catch(e){msg.textContent=e.message;msg.style.color='#c00';}};
   const addBtn=$('#add-friend-btn');
   if(addBtn)addBtn.onclick=async()=>{const input=$('#friend-input');if(!input)return;const name=input.value.trim();if(!name)return;if(!state.friends)state.friends=[];if(state.friends.includes(name))return;try{await GymSync.addFriend(name);state.friends.push(name);save();input.value='';render();setTimeout(loadFriendFeed,50);}catch(e){const msg=$('#username-msg');if(msg){msg.textContent=e.message;msg.style.color='#c00';}}};
   const friendsList=$('#friends-list');
@@ -978,7 +1015,6 @@ save=async function(send=true){
       await GymSync.pushState(state);
     } catch(e){
       console.error('Sync failed:', e);
-      // updateSyncStatus will pick up the error from getSyncStatus
     }
     updateSyncStatus();
   }
