@@ -35,6 +35,7 @@ const PLANS = [
     level:'Beginner',
     goal:'Strength',
     duration:'45 min · 12 weeks',
+    sessionsPerWeek:3,
     desc:'The classic 5×5 program. Three alternating workouts, five sets of five reps. Simple and effective.',
     days:[
       ['Workout A',['Barbell Back Squat','Barbell Bench Press','Barbell Row']],
@@ -72,6 +73,7 @@ const PLANS = [
     level:'Beginner',
     goal:'Strength',
     duration:'45 min · 12 weeks',
+    sessionsPerWeek:3,
     desc:'Phrak\'s Greyskull variant. Linear progression with AMRAP final sets for extra hypertrophy stimulus.',
     days:[
       ['Day A',['Barbell Back Squat','Barbell Bench Press','Barbell Row']],

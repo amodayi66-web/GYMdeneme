@@ -114,7 +114,10 @@ function renderTemplates(){
   // Update filter active states
   document.querySelectorAll('#level-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.level===level));
   document.querySelectorAll('#goal-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.goal===goalFilter));
-  $('#template-grid').innerHTML=plans.map(p=>`<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${p.days.length} SESSION ROTATION</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(byName).filter(Boolean).map(id=>{const e=byId(id);return e?e.name:`?`}).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><button class="button" data-choose="${p.id}">Add this plan →</button></article>`).join('');
+  $('#template-grid').innerHTML=plans.map(p=>{
+    const sessionsPerWeek = p.sessionsPerWeek || Math.min(p.days.length * 2, 6);
+    return `<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${sessionsPerWeek} SESSIONS/WEEK</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(byName).filter(Boolean).map(id=>{const e=byId(id);return e?e.name:`?`}).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="button" data-choose="${p.id}">Add this plan →</button><button class="button white" data-seemore="${p.id}">See more</button></div></article>`;
+  }).join('');
 }
 
 function addPlan(pid){
@@ -172,7 +175,7 @@ function workout(id){
   if(!w)return home();
   return `<a class="back" href="#/">← My plan</a>
   <div class="session-head"><div>${head(esc(w.name),`${w.exercises.length} movements. Keep the session simple and focused.`)}</div><a class="button" href="#/log/${w.id}">Start session →</a></div>
-  <div class="workout-grid">${w.exercises.map(x=>{let e=byId(x);return `<article class="workout-card"><small>${e.category.toUpperCase()}</small><h2>${e.name}</h2><p>${e.muscles.join(' · ')}</p><div class="card-foot"><span>WORKING MUSCLES</span></div></article>`}).join('')}</div>
+  <div class="workout-grid">${w.exercises.map(x=>{let e=byId(x);if(!e)return '';return `<article class="workout-card"><small>${e.category.toUpperCase()}</small><h2>${e.name}</h2><p>${e.muscles.join(' · ')}</p><div class="card-foot"><span>WORKING MUSCLES</span></div></article>`}).join('')}</div>
   <div style="display:flex;gap:12px;margin-top:30px;flex-wrap:wrap">
     <a class="button mint" href="#/edit/${w.id}">✎ Edit workout</a>
     <button class="button white" data-delete="${w.id}">Delete workout</button>
@@ -231,6 +234,7 @@ function log(id){
   
   <div class="log-layout"><section>${w.exercises.map(x=>{
     let e=byId(x);
+    if(!e)return '';
     const prev=GymAnalytics.getPreviousExerciseData(state.logs,x);
     const prevHtml=prev?`<div class="prev-best ${prev?'pr':''}">Best: ${prev.reps} reps × ${prev.weight} kg (${prev.date})</div>`:'';
     const prevSets=getPreviousSets(x);
@@ -661,7 +665,30 @@ function bind(){
     };
     $('#template-grid').onclick=e=>{
       if(e.target.dataset.choose)addPlan(e.target.dataset.choose);
+      if(e.target.dataset.seemore)showPlanDetails(e.target.dataset.seemore);
     };
+    
+    function showPlanDetails(pid){
+      const p=PLANS.find(x=>x.id===pid);
+      if(!p)return;
+      const overlay=document.createElement('div');
+      overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center';
+      overlay.onclick=()=>overlay.remove();
+      overlay.innerHTML=`<div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:600px;width:90%;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <h2 style="font-size:28px;letter-spacing:-1px;margin:0 0 4px">${esc(p.name)}</h2>
+        <p style="font:10px 'DM Mono',monospace;color:#666;margin:0 0 16px">${p.level} / ${p.goal} / ${p.duration}</p>
+        <p style="line-height:1.5;margin:0 0 16px">${p.desc}</p>
+        ${p.days.map(d=>`<div style="margin-bottom:12px;padding:12px;background:var(--lilac);border:2px solid var(--ink)">
+          <b style="font-size:14px">${esc(d[0])}</b>
+          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${d[1].map(byName).filter(Boolean).map(id=>{const e=byId(id);return e?`<span style="background:#fff;border:1px solid var(--ink);padding:3px 6px;font:10px 'DM Mono',monospace">${esc(e.name)}</span>`:''}).join('')}</div>
+        </div>`).join('')}
+        <button class="button" data-choose="${p.id}" style="margin-top:8px">Add this plan →</button>
+        <button class="button white" style="margin-top:8px;margin-left:8px" onclick="this.closest('div[style]').parentElement.remove()">Close</button>
+      </div>`;
+      document.body.appendChild(overlay);
+      // Re-bind the choose button inside the popup
+      overlay.querySelector('[data-choose]').onclick=()=>{addPlan(pid);overlay.remove();};
+    }
   }
   
   // ── Builder ──
