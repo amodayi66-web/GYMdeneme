@@ -116,7 +116,8 @@ function renderTemplates(){
   document.querySelectorAll('#goal-filter .filter').forEach(b=>b.classList.toggle('active',b.dataset.goal===goalFilter));
   $('#template-grid').innerHTML=plans.map(p=>{
     const sessionsPerWeek = p.sessionsPerWeek || Math.min(p.days.length * 2, 6);
-    return `<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${sessionsPerWeek} SESSIONS/WEEK</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(byName).filter(Boolean).map(id=>{const e=byId(id);return e?e.name:`?`}).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="button" data-choose="${p.id}">Add this plan →</button><button class="button white" data-seemore="${p.id}">See more</button></div></article>`;
+    const getPlanExName = ex => byName(Array.isArray(ex) ? ex[0] : ex);
+    return `<article class="template-card"><small>${p.level.toUpperCase()} / ${p.goal.toUpperCase()} / ${sessionsPerWeek} SESSIONS/WEEK</small><h2>${p.name}</h2><p>${p.desc}</p><div class="meta"><span class="chip">${p.duration}</span><span class="chip">${p.days.length} workouts</span><span class="chip">${p.goal}</span></div><div class="plan-list">${p.days.map(d=>`<b>${d[0]}</b> — ${d[1].slice(0,3).map(getPlanExName).filter(Boolean).map(id=>{const e=byId(id);return e?e.name:`?`}).join(', ')}${d[1].length>3?'…':''}<br>`).join('')}</div><div style="display:flex;gap:8px;margin-top:12px"><button class="button" data-choose="${p.id}">Add this plan →</button><button class="button white" data-seemore="${p.id}">See more</button></div></article>`;
   }).join('');
 }
 
@@ -701,7 +702,7 @@ function bind(){
         <p style="line-height:1.5;margin:0 0 16px">${p.desc}</p>
         ${p.days.map(d=>`<div style="margin-bottom:12px;padding:12px;background:var(--lilac);border:2px solid var(--ink)">
           <b style="font-size:14px">${esc(d[0])}</b>
-          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${d[1].map(byName).filter(Boolean).map(id=>{const e=byId(id);return e?`<span style="background:#fff;border:1px solid var(--ink);padding:3px 6px;font:10px 'DM Mono',monospace">${esc(e.name)}</span>`:''}).join('')}</div>
+          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${d[1].map(ex=>{const en=Array.isArray(ex)?ex[0]:ex;return byName(en);}).filter(Boolean).map(id=>{const e=byId(id);return e?`<span style="background:#fff;border:1px solid var(--ink);padding:3px 6px;font:10px 'DM Mono',monospace">${esc(e.name)}</span>`:''}).join('')}</div>
         </div>`).join('')}
         <button class="button" data-choose="${p.id}" style="margin-top:8px">Add this plan →</button>
         <button class="button white" style="margin-top:8px;margin-left:8px" onclick="this.closest('div[style]').parentElement.remove()">Close</button>
