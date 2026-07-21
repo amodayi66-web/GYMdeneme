@@ -862,7 +862,7 @@ function initLog(){
     const duration=workoutTimer?workoutTimer.stop():0; const durationStr=GymTimers.formatDuration(duration);
     let l={id:uid(), workout:finish.dataset.finish, date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}), duration:durationStr, sets};
     state.logs.push(l); save();
-    if(GymSync.isConfigured()&&GymSync.isSignedIn()){GymSync.pushState(state).catch(()=>{});}
+    if(GymSync.isConfigured()&&GymSync.isSignedIn()){try{GymSync.pushState(state)}catch(e){console.error('Sync error:',e)}}
     location.hash=`#/summary/${l.id}`;
   };
   
@@ -971,4 +971,15 @@ render();
 updateSyncStatus();
 
 const origSave=save;
-save=function(send=true){origSave(send);if(GymSync.isConfigured()&&GymSync.isSignedIn()){GymSync.pushState(state).catch(()=>{});}};
+save=async function(send=true){
+  origSave(send);
+  if(GymSync.isConfigured()&&GymSync.isSignedIn()){
+    try {
+      await GymSync.pushState(state);
+    } catch(e){
+      console.error('Sync failed:', e);
+      // updateSyncStatus will pick up the error from getSyncStatus
+    }
+    updateSyncStatus();
+  }
+};
