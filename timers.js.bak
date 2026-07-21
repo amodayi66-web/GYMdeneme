@@ -12,14 +12,20 @@ const GymTimers = (() => {
     try {
       if ('wakeLock' in navigator) {
         wakeLock = await navigator.wakeLock.request('screen');
-        wakeLock.addEventListener('release', () => { wakeLock = null; });
+        wakeLock.addEventListener('release', () => {
+          wakeLock = null;
+        });
       }
-    } catch (e) { /* silent fallback */ }
+    } catch (e) {
+      // Wake lock not supported or denied — silently fall back
+    }
   }
 
   async function releaseWakeLock() {
     if (wakeLock) {
-      try { await wakeLock.release(); } catch (e) { /* ignore */ }
+      try {
+        await wakeLock.release();
+      } catch (e) { /* ignore */ }
       wakeLock = null;
     }
   }
@@ -47,53 +53,64 @@ const GymTimers = (() => {
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration / 1000);
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + duration / 1000);
-    } catch (e) { /* silent fallback */ }
+    } catch (e) {
+      // Audio not available, fallback silently
+    }
   }
 
-  function playCountdownBeep() { playBeep(660, 150); }
-  function playGoBeep() { playBeep(1320, 400); }
+  function playCountdownBeep() {
+    playBeep(660, 150);
+  }
+
+  function playGoBeep() {
+    playBeep(1320, 400);
+  }
 
   // ── Workout Duration Timer ─────────────────────────────────────────────
-  // TIMESTAMP-BASED: survives screen lock, backgrounding, tab suspension
   function createWorkoutTimer(onTick) {
-    let startTime = null;    // Date.now() when timer started (absolute)
+    let startTime = null;
     let interval = null;
+    let elapsed = 0;
 
     function start() {
-      if (startTime !== null) return; // already started
-      startTime = Date.now();
+      if (interval) return;
+      startTime = Date.now() - elapsed;
+      // Request wake lock to keep screen on
       requestWakeLock();
-      if (onTick) onTick(formatDuration(0));
       interval = setInterval(() => {
-        if (startTime === null) return;
-        const elapsed = Date.now() - startTime;
+        elapsed = Date.now() - startTime;
         if (onTick) onTick(formatDuration(elapsed));
       }, 1000);
     }
 
     function stop() {
-      if (interval) { clearInterval(interval); interval = null; }
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
       releaseWakeLock();
-      return startTime !== null ? Date.now() - startTime : 0;
-    }
-
-    function getElapsedMs() {
-      return startTime !== null ? Date.now() - startTime : 0;
+      return elapsed;
     }
 
     function reset() {
       stop();
-      startTime = null;
+      elapsed = 0;
       if (onTick) onTick('00:00');
     }
 
-    function isRunning() { return startTime !== null; }
+    function getElapsed() {
+      return elapsed;
+    }
 
-    return { start, stop, reset, getElapsedMs, isRunning };
+    function getFormatted() {
+      return formatDuration(elapsed);
+    }
+
+    return { start, stop, reset, getElapsed, getFormatted };
   }
 
   function formatDuration(ms) {
-    const totalSec = Math.floor(Math.max(0, ms) / 1000);
+    const totalSec = Math.floor(ms / 1000);
     const min = Math.floor(totalSec / 60);
     const sec = totalSec % 60;
     return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
@@ -101,17 +118,17 @@ const GymTimers = (() => {
 
   // ── Rest Timer ─────────────────────────────────────────────────────────
   function createRestTimer(onTick, onComplete) {
-    let duration = 90;
+    let duration = 90; // default 90 seconds
     let remaining = 0;
     let interval = null;
     let isRunning = false;
     let isCountdown = false;
     let countdownInterval = null;
     let restStartTime = null;
-    let countdownStartTime = null;
 
-    function setDuration(sec) { duration = sec; }
-    function getDuration() { return duration; }
+    function setDuration(sec) {
+      duration = sec;
+    }
 
     function start() {
       if (isRunning) return;
@@ -119,16 +136,16 @@ const GymTimers = (() => {
       isRunning = true;
       isCountdown = false;
       restStartTime = Date.now();
+      // Request wake lock to keep screen on during rest
       requestWakeLock();
       tick();
       interval = setInterval(() => {
+        // Calculate remaining based on real elapsed time, not just decrementing
         const realElapsed = Math.floor((Date.now() - restStartTime) / 1000);
         remaining = Math.max(0, duration - realElapsed);
         tick();
         if (remaining <= 0) {
           stop();
-          // Schedule countdown beeps at precise times
-          countdownStartTime = Date.now();
           startCountdown();
         }
       }, 1000);
@@ -139,32 +156,26 @@ const GymTimers = (() => {
     }
 
     function stop() {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
       isRunning = false;
-      if (interval) { clearInterval(interval); interval = null; }
       releaseWakeLock();
     }
 
     function startCountdown() {
       isCountdown = true;
-      // Play first beep + show 3 immediately
+      let count = 3;
       playCountdownBeep();
       if (onTick) onTick('3!', 3);
-
+      
       countdownInterval = setInterval(() => {
-        // Calculate which second we're in based on real elapsed time
-        const elapsedMs = countdownStartTime ? Date.now() - countdownStartTime : 0;
-        const elapsedSec = Math.floor(elapsedMs / 1000);
-        const count = 3 - elapsedSec;
-
-        if (count > 1) {
-          // Play beep at the START of each second (already aligned by setInterval)
+        count--;
+        if (count > 0) {
           playCountdownBeep();
           if (onTick) onTick(`${count}!`, count);
-        } else if (count === 1) {
-          // Play final countdown beep at second 1
-          playCountdownBeep();
-          if (onTick) onTick('1!', 1);
-        } else if (count <= 0) {
+        } else if (count === 0) {
           playGoBeep();
           if (onTick) onTick('GO!', 0);
           clearInterval(countdownInterval);
@@ -177,17 +188,25 @@ const GymTimers = (() => {
 
     function reset() {
       stop();
-      if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+      if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+      }
       remaining = 0;
       isRunning = false;
       isCountdown = false;
       if (onTick) onTick(formatDuration(duration * 1000), duration);
     }
 
-    function getRemaining() { return remaining; }
-    function isActive() { return isRunning || isCountdown; }
+    function getRemaining() {
+      return remaining;
+    }
 
-    return { setDuration, getDuration, start, stop, reset, getRemaining, isActive };
+    function isActive() {
+      return isRunning || isCountdown;
+    }
+
+    return { setDuration, start, stop, reset, getRemaining, isActive };
   }
 
   return {
