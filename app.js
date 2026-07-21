@@ -96,7 +96,7 @@ function home(){
     <a class="button" href="#/log/${nextW.id}">Start next workout →</a>
   </div>`:''}
   <section><div class="section-head"><div><div class="eyebrow">YOUR WORKOUTS</div><h2>My plan</h2></div><a class="button mint" href="#/templates">Choose a plan →</a></div>
-  ${state.workouts.length?`<div class="workout-grid">${state.workouts.map((w,i)=>`<a href="#/workout/${w.id}" class="workout-card"><small>${String(i+1).padStart(2,'0')} / ${w.exercises.length} exercises</small><h2>${esc(w.name)}</h2><p>${w.exercises.slice(0,3).map(id=>{const e=byId(id);return e?e.name:'?'}).join(' · ')}${w.exercises.length>3?' · …':''}</p><div class="card-foot"><span>OPEN WORKOUT</span><span>↗</span></div></a>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
+  ${state.workouts.length?`<div class="workout-grid">${state.workouts.map((w,i)=>`<a href="#/workout/${w.id}" class="workout-card"><small>${String(i+1).padStart(2,'0')} / ${w.exercises.length} exercises</small><h2>${esc(w.name)}</h2><p>${w.exercises.slice(0,3).map(x=>{const e=byId(getExId(x));return e?e.name:'?'}).join(' · ')}${w.exercises.length>3?' · …':''}</p><div class="card-foot"><span>OPEN WORKOUT</span><span>↗</span></div></a>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
 }
 
 // ── TEMPLATES PAGE ─────────────────────────────────────────────────────
@@ -122,7 +122,18 @@ function renderTemplates(){
 
 function addPlan(pid){
   let p=PLANS.find(x=>x.id===pid);
-  p.days.forEach(d=>state.workouts.push({id:uid(),name:`${p.name} · ${d[0]}`,exercises:d[1].map(byName),source:p.name}));
+  p.days.forEach(d=>{
+    // Support both old format (string array) and new format ([name, prescription] arrays)
+    const exercises = d[1].map(ex => {
+      if(Array.isArray(ex)){
+        // New format: [exerciseName, prescription]
+        return {id: byName(ex[0]), prescription: ex[1]};
+      }
+      // Old format: exerciseName string
+      return {id: byName(ex)};
+    });
+    state.workouts.push({id:uid(),name:`${p.name} · ${d[0]}`,exercises,source:p.name});
+  });
   save();location.hash='#/';
 }
 
@@ -169,13 +180,21 @@ function renderBuilder(){
   $('#selected-list').innerHTML=selected.length?selected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-move-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-move-down="${x}" ${i===selected.length-1?'disabled':''}>▼</button></span>${byId(x).name}<button class="remove" data-remove="${x}">×</button></li>`).join(''):'<li>Choose exercises to begin.</li>';
 }
 
+// ── Helper to get exercise ID from old (string) or new ({id, prescription}) format ──
+function getExId(x){
+  return typeof x === 'string' ? x : (x && x.id);
+}
+function getExPrescription(x){
+  return (typeof x === 'object' && x && x.prescription) || '';
+}
+
 // ── WORKOUT DETAIL PAGE ────────────────────────────────────────────────
 function workout(id){
   let w=state.workouts.find(x=>x.id===id);
   if(!w)return home();
   return `<a class="back" href="#/">← My plan</a>
   <div class="session-head"><div>${head(esc(w.name),`${w.exercises.length} movements. Keep the session simple and focused.`)}</div><a class="button" href="#/log/${w.id}">Start session →</a></div>
-  <div class="workout-grid">${w.exercises.map(x=>{let e=byId(x);if(!e)return '';return `<article class="workout-card"><small>${e.category.toUpperCase()}</small><h2>${e.name}</h2><p>${e.muscles.join(' · ')}</p><div class="card-foot"><span>WORKING MUSCLES</span></div></article>`}).join('')}</div>
+  <div class="workout-grid">${w.exercises.map(x=>{let e=byId(getExId(x));if(!e)return '';const pres=getExPrescription(x);return `<article class="workout-card"><small>${e.category.toUpperCase()}</small><h2>${e.name}</h2><p>${e.muscles.join(' · ')}</p>${pres?`<div class="prescription">${esc(pres)}</div>`:''}<div class="card-foot"><span>WORKING MUSCLES</span></div></article>`}).join('')}</div>
   <div style="display:flex;gap:12px;margin-top:30px;flex-wrap:wrap">
     <a class="button mint" href="#/edit/${w.id}">✎ Edit workout</a>
     <button class="button white" data-delete="${w.id}">Delete workout</button>
@@ -233,18 +252,20 @@ function log(id){
   </div>
   
   <div class="log-layout"><section>${w.exercises.map(x=>{
-    let e=byId(x);
+    const exId=getExId(x);
+    let e=byId(exId);
     if(!e)return '';
-    const prev=GymAnalytics.getPreviousExerciseData(state.logs,x);
+    const pres=getExPrescription(x);
+    const prev=GymAnalytics.getPreviousExerciseData(state.logs,exId);
     const prevHtml=prev?`<div class="prev-best ${prev?'pr':''}">Best: ${prev.reps} reps × ${prev.weight} kg (${prev.date})</div>`:'';
-    const prevSets=getPreviousSets(x);
+    const prevSets=getPreviousSets(exId);
     const prevSetsHtml=prevSets?`<div class="prev-sets-heading">LAST SESSION (${prevSets.date})</div><div class="prev-sets-grid">${prevSets.sets.map((s,i)=>`<span class="prev-set">Set ${i+1}: ${s.reps}×${s.weight} kg${s.rpe?' @'+s.rpe:''}</span>`).join('')}</div>`:'';
-    const note=getExerciseNote(x);
+    const note=getExerciseNote(exId);
     const noteHtml=note?`<div class="exercise-note">📝 ${esc(note)}</div>`:'';
-    const swapEx=getSimilarExercises(x);
-    const swapHtml=swapEx.length?`<div class="swap-section"><button class="swap-btn" data-swap="${x}">↔ Swap</button><div class="swap-options" id="swap-${x}" style="display:none">${swapEx.map(s=>`<button class="swap-option" data-swap-from="${x}" data-swap-to="${s.id}">${esc(s.name)}</button>`).join('')}</div></div>`:'';
-    const warmupSets=`<div class="warmup-section"><button class="toggle-warmup" data-exercise="${x}">+ Warm-up sets</button><div class="warmup-sets" id="warmup-${x}" style="display:none"></div></div>`;
-    return `<article class="log-card" data-exercise="${x}"><div class="log-card-header"><h2>${e.name}</h2>${swapHtml}</div><small>${e.muscles.join(' · ')}</small>${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}<div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span></div><div class="sets">${setRow(1)}${setRow(2)}${setRow(3)}</div><button class="add-set">+ add set</button></article>`;
+    const swapEx=getSimilarExercises(exId);
+    const swapHtml=swapEx.length?`<div class="swap-section"><button class="swap-btn" data-swap="${exId}">↔ Swap</button><div class="swap-options" id="swap-${exId}" style="display:none">${swapEx.map(s=>`<button class="swap-option" data-swap-from="${exId}" data-swap-to="${s.id}">${esc(s.name)}</button>`).join('')}</div></div>`:'';
+    const warmupSets=`<div class="warmup-section"><button class="toggle-warmup" data-exercise="${exId}">+ Warm-up sets</button><div class="warmup-sets" id="warmup-${exId}" style="display:none"></div></div>`;
+    return `<article class="log-card" data-exercise="${exId}"><div class="log-card-header"><h2>${e.name}</h2>${swapHtml}</div><small>${e.muscles.join(' · ')}</small>${pres?`<div class="prescription">${esc(pres)}</div>`:''}${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}<div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span></div><div class="sets">${setRow(1)}${setRow(2)}${setRow(3)}</div><button class="add-set">+ add set</button></article>`;
   }).join('')}</section><aside class="totals">
     <div class="eyebrow">SESSION TOTAL</div>
     <h2>Today’s work</h2>

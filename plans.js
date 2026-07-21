@@ -62,9 +62,9 @@ const PLANS = [
     duration:'60 min · 8 weeks',
     desc:'Dr. Swole\'s science-based 3 Day Full Body Powerbuilding Split. Designed for hypertrophy and strength. Train full body 3x a week using Greyskull LP progression on main lifts with RPE-based accessory work.',
     days:[
-      ['Full Body A',['Barbell Back Squat','Barbell Bench Press','Barbell Lunges','Barbell Row','Dumbbell Hammer Curl','Cable Triceps Pushdown','Dumbbell Lateral Raise','Calf Raise Machine (Standing)']],
-      ['Full Body B',['Barbell Deadlift (Conventional)','Overhead Press (Strict)','Machine Leg Press','Barbell Bench Press','Pull-up','EZ Bar Curl','Barbell Upright Row','Calf Raise Machine (Standing)']],
-      ['Full Body C',['Barbell Back Squat','Barbell Bench Press','Romanian Deadlift','Cable Seated Row','Dumbbell Curl','EZ Bar Skull Crusher','Dumbbell Lateral Raise','Calf Raise Machine (Standing)']]
+      ['Full Body A',[['Barbell Back Squat','1×5 @7, 1×5+ @8'],['Barbell Bench Press','1×5 @7, 1×5+ @8'],['Barbell Lunges','2×8-12 @8'],['Barbell Row','1×8-12 @8, 2×8-12 @8'],['Dumbbell Hammer Curl','2×8-12 @8'],['Cable Triceps Pushdown','2×8-12 @8'],['Dumbbell Lateral Raise','3×8-12 @8'],['Calf Raise Machine (Standing)','2×8-12 @8']]],
+      ['Full Body B',[['Barbell Deadlift (Conventional)','2×5 @8, 1×5+ @9'],['Overhead Press (Strict)','2×5 @8, 1×5+ @9'],['Machine Leg Press','2×8-12 @9, 1×8-12 @10'],['Barbell Bench Press','1×8-12 @9, 2×8-12 @9, 1×8-12 @10'],['Pull-up','2×8-12 @9, 1×8-12 @10'],['EZ Bar Curl','2×8-12 @9, 1×8-12 @10'],['Barbell Upright Row','2×8-12 @9, 1×8-12 @10'],['Calf Raise Machine (Standing)','2×8-12 @9, 1×8-12 @10']]],
+      ['Full Body C',[['Barbell Back Squat','2×5 @8, 1×5+ @9'],['Barbell Bench Press','2×5 @8, 1×5+ @9'],['Romanian Deadlift','2×8-12 @9, 1×8-12 @10'],['Cable Seated Row','1×8-12 @9, 2×8-12 @9, 1×8-12 @10'],['Dumbbell Curl','2×8-12 @9, 1×8-12 @10'],['EZ Bar Skull Crusher','2×8-12 @9, 1×8-12 @10'],['Dumbbell Lateral Raise','3×8-12 @9, 1×8-12 @10'],['Calf Raise Machine (Standing)','2×8-12 @9, 1×8-12 @10']]]
     ]
   },
   {
