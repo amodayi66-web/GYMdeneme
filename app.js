@@ -1084,24 +1084,30 @@ function initSocial(){
         if(!plan)return;
         // Check which plan days are missing from our workouts
         const existingNames=new Set(sourceWorkouts.map(w=>w.name));
+        // Build a map: name → id from logs, in case the old workout ID was lost
+        // but a log still references it by name
+        const logWorkoutIds=new Map();
+        state.logs.forEach(l=>{
+          const w=state.workouts.find(x=>x.id===l.workout);
+          if(w)logWorkoutIds.set(w.name, l.workout);
+        });
         let added=false;
         plan.days.forEach(d=>{
           const expectedName=`${plan.name} · ${d[0]}`;
           if(!existingNames.has(expectedName)){
-            // This workout is missing — regenerate it
+            // Check if a log references this workout by name (from old data)
+            const oldId=logWorkoutIds.get(expectedName);
             const exercises=d[1].map(ex=>{
               if(Array.isArray(ex)) return {id:byName(ex[0]),prescription:ex[1]};
               return {id:byName(ex)};
             });
-            state.workouts.push({id:uid(),name:expectedName,exercises,source:plan.name});
+            // Reuse the old ID if it exists, so logs still match
+            state.workouts.push({id:oldId||uid(),name:expectedName,exercises,source:plan.name});
             added=true;
           }
         });
         if(added)save();
       }
-      
-      // Run repair after merge
-      repairMissingPlanWorkouts();
       
       // Always merge cloud data first (username-based path)
       if(result.cloudData){
@@ -1111,6 +1117,10 @@ function initSocial(){
         const cloudData=await GymSync.pullState();
         mergeCloudData(cloudData);
       }
+      
+      // Then repair: if workouts from a plan are missing, regenerate them
+      // This runs AFTER merge, so it can find old log IDs from cloud data
+      repairMissingPlanWorkouts();
       
       // Push current state to cloud
       await GymSync.pushState(state);
