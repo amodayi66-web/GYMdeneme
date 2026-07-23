@@ -191,16 +191,16 @@ function builder(){
     <label class="label" for="workout-name">Workout name</label>
     <input id="workout-name" class="text-input" maxlength="50" placeholder="e.g. Saturday upper body">
     <input id="search-exercises" class="search-input" placeholder="Search exercises..." value="${esc(searchQuery)}">
+    <button class="button white small" id="custom-ex-builder" style="margin-bottom:8px">+ Custom Exercise</button>
+    <div id="custom-ex-builder-input" style="display:none;margin-bottom:12px;border:2px solid var(--ink);padding:8px;background:var(--mint)">
+      <input id="custom-ex-name" class="text-input" placeholder="Exercise name (e.g. Safety Bar Squat)" style="margin-bottom:6px">
+      <button class="button small" id="save-custom-ex-builder">Add to selection →</button>
+    </div>
     <div class="eyebrow" style="margin-bottom:6px">Muscle group</div>
     <div id="muscle-filters" class="filter-row compact"></div>
     <div class="eyebrow" style="margin-bottom:6px">Equipment</div>
     <div id="equip-filters" class="filter-row compact"></div>
     <div id="exercise-list" class="exercise-list"></div>
-    <button class="button white small" id="custom-ex-builder" style="margin-top:8px">+ Custom Exercise</button>
-    <div id="custom-ex-builder-input" style="display:none;margin-top:8px;border:2px solid var(--ink);padding:8px;background:var(--mint)">
-      <input id="custom-ex-name" class="text-input" placeholder="Exercise name (e.g. Safety Bar Squat)" style="margin-bottom:6px">
-      <button class="button small" id="save-custom-ex-builder">Add to selection →</button>
-    </div>
   </section><aside class="selection">
     <div class="eyebrow">YOUR SELECTION</div>
     <h2><span id="count">0</span> exercises</h2>
@@ -1028,28 +1028,27 @@ function initSocial(){
       msg.textContent=`Signed in as ${result.profile.username}!`;
       msg.style.color='var(--ink)';
       
-      // If cloudData was returned (migrated from old UID), merge it
-      if(result.cloudData){
-        const cd=result.cloudData;
-        if(cd.workouts&&cd.workouts.length&&!state.workouts.length)state.workouts=cd.workouts;
-        if(cd.logs&&cd.logs.length&&!state.logs.length)state.logs=cd.logs;
-        if(cd.exerciseNotes&&Object.keys(cd.exerciseNotes).length)state.exerciseNotes={...cd.exerciseNotes,...state.exerciseNotes};
+      // Merge cloud data: cloud data ALWAYS wins (it's the source of truth)
+      // This ensures data is restored on any device, even if local state has data
+      function mergeCloudData(cd){
+        if(!cd)return;
+        if(cd.workouts&&cd.workouts.length)state.workouts=cd.workouts;
+        if(cd.logs&&cd.logs.length)state.logs=cd.logs;
+        if(cd.exerciseNotes&&Object.keys(cd.exerciseNotes).length)state.exerciseNotes={...state.exerciseNotes,...cd.exerciseNotes};
         if(cd.bodyMeasurements&&cd.bodyMeasurements.length)state.bodyMeasurements=cd.bodyMeasurements;
         if(cd.friends&&cd.friends.length)state.friends=cd.friends;
         if(cd.volumeGoal)state.volumeGoal=cd.volumeGoal;
+        if(cd.customExercises&&cd.customExercises.length)state.customExercises=cd.customExercises;
         save();
+      }
+      
+      // Always merge cloud data first (username-based path)
+      if(result.cloudData){
+        mergeCloudData(result.cloudData);
       } else {
-        // No migration happened, try pullState
+        // Try pull from username-based path
         const cloudData=await GymSync.pullState();
-        if(cloudData&&(cloudData.workouts?.length||cloudData.logs?.length)){
-          if(cloudData.workouts?.length&&!state.workouts.length)state.workouts=cloudData.workouts;
-          if(cloudData.logs?.length&&!state.logs.length)state.logs=cloudData.logs;
-          if(cloudData.exerciseNotes&&Object.keys(cloudData.exerciseNotes).length)state.exerciseNotes={...cloudData.exerciseNotes,...state.exerciseNotes};
-          if(cloudData.bodyMeasurements?.length)state.bodyMeasurements=cloudData.bodyMeasurements;
-          if(cloudData.friends?.length)state.friends=cloudData.friends;
-          if(cloudData.volumeGoal)state.volumeGoal=cloudData.volumeGoal;
-          save();
-        }
+        mergeCloudData(cloudData);
       }
       
       // Push current state to cloud

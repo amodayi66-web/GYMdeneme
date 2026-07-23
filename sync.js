@@ -15,14 +15,34 @@ const GymSync = (() => {
     firebase.initializeApp(cfg);
     auth = firebase.auth();
     db = firebase.firestore();
-    // Enable offline persistence so writes queue up even if offline
     db.enablePersistence().catch(() => {});
   }
 
   function onAuth(cb) { listeners.auth.push(cb); if (user !== null) cb(user, profile); }
   function fireAuth() { listeners.auth.forEach(cb => cb(user, profile)); }
-
   function getSyncStatus() { return lastSyncResult; }
+
+  // ── Helper: get the username-based data path ──
+  function getUsernameDataRef(username) {
+    const key = username.toLowerCase().trim();
+    return db.collection('usernames').doc(key).collection('data').doc('state');
+  }
+
+  // ── Helper: read data from a given doc ref ──
+  function extractData(doc) {
+    if (!doc || !doc.exists) return null;
+    const d = doc.data();
+    return {
+      workouts: d.workouts || [],
+      logs: d.logs || [],
+      username: d.username || '',
+      friends: d.friends || [],
+      volumeGoal: d.volumeGoal || 0,
+      exerciseNotes: d.exerciseNotes || {},
+      bodyMeasurements: d.bodyMeasurements || [],
+      customExercises: d.customExercises || []
+    };
+  }
 
   async function ensureSignedIn() {
     if (!configured) return null;
@@ -31,9 +51,8 @@ const GymSync = (() => {
     return cred.user;
   }
 
-  // Claim a display username. If the username already exists, we do NOT
-  // reassign it — instead we read the existing data and return it so the
-  // caller can merge it locally. This prevents data loss when switching devices.
+  // ── Claim a username. Data is stored by USERNAME, not by UID. ──
+  // This means every device using the same username reads/writes the same data.
   async function claimUsername(username) {
     if (!configured) throw new Error('Sync is not configured yet.');
     const clean = username.trim();
@@ -42,51 +61,64 @@ const GymSync = (() => {
     const key = clean.toLowerCase();
     const nameRef = db.collection('usernames').doc(key);
     
-    let existingUid = null;
     let cloudData = null;
+    let existingDoc = null;
     
-    // Check if username already exists
-    const existingDoc = await nameRef.get();
+    try {
+      existingDoc = await nameRef.get();
+    } catch (e) {
+      // If this fails (e.g. security rules), we still try to proceed
+    }
     
-    if (existingDoc.exists) {
-      // Username is taken — read data from the existing UID
-      existingUid = existingDoc.data().uid;
-      
-      // Try to read state data from the existing UID
+    if (existingDoc && existingDoc.exists) {
+      // Username exists — try to read data from the USERNAME-BASED path first
       try {
-        const stateDoc = await db.collection('users').doc(existingUid).collection('state').doc('data').get();
-        if (stateDoc.exists) {
-          const d = stateDoc.data();
-          cloudData = {
-            workouts: d.workouts || [],
-            logs: d.logs || [],
-            username: d.username || clean,
-            friends: d.friends || [],
-            volumeGoal: d.volumeGoal || 0,
-            exerciseNotes: d.exerciseNotes || {},
-            bodyMeasurements: d.bodyMeasurements || []
-          };
-        }
+        const stateDoc = await getUsernameDataRef(key).get();
+        cloudData = extractData(stateDoc);
       } catch (e) {
-        console.error('Failed to read existing data:', e);
+        console.error('Failed to read username-based data:', e);
       }
       
-      // Also write our UID to the username doc so the username
-      // can be found from any device (multi-device support)
-      // We keep the original uid as the "primary" but add our uid
+      // If no data at username path, try the old UID-based path (migration)
+      if (!cloudData) {
+        const oldUid = existingDoc.data().uid;
+        if (oldUid) {
+          try {
+            const oldDoc = await db.collection('users').doc(oldUid).collection('state').doc('data').get();
+            cloudData = extractData(oldDoc);
+            // Migrate to username-based path
+            if (cloudData) {
+              await getUsernameDataRef(key).set(cloudData);
+            }
+          } catch (e) {
+            console.error('Failed to migrate old data:', e);
+          }
+        }
+      }
+      
+      // Also scan all linked UIDs for data
+      const uids = existingDoc.data().uids || [existingDoc.data().uid].filter(Boolean);
+      if (!cloudData) {
+        for (const uid of uids) {
+          try {
+            const doc = await db.collection('users').doc(uid).collection('state').doc('data').get();
+            const data = extractData(doc);
+            if (data && (data.workouts.length || data.logs.length)) {
+              cloudData = data;
+              // Migrate to username path
+              await getUsernameDataRef(key).set(data);
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+      
+      // Update the username doc: add our UID to the list
       await nameRef.set({
-        uid: existingUid,  // Keep original as primary
+        uid: existingDoc.data().uid || authedUser.uid,
         uids: firebase.firestore.FieldValue.arrayUnion(authedUser.uid),
         username: clean,
         lastAccessed: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-      
-      // Write our profile
-      await db.collection('users').doc(authedUser.uid).set({
-        username: clean,
-        usernameLower: key,
-        linkedTo: existingUid,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     } else {
       // Username is free — claim it
@@ -96,12 +128,6 @@ const GymSync = (() => {
         username: clean,
         lastAccessed: firebase.firestore.FieldValue.serverTimestamp()
       });
-      
-      await db.collection('users').doc(authedUser.uid).set({
-        username: clean,
-        usernameLower: key,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
     }
     
     user = authedUser;
@@ -115,8 +141,12 @@ const GymSync = (() => {
     auth.onAuthStateChanged(async u => {
       if (!u) { user = null; profile = null; lastSyncResult = null; fireAuth(); return; }
       user = u;
-      const doc = await db.collection('users').doc(u.uid).get();
-      profile = doc.exists ? { username: doc.data().username, uid: u.uid } : null;
+      try {
+        const doc = await db.collection('users').doc(u.uid).get();
+        profile = doc.exists ? { username: doc.data().username, uid: u.uid } : null;
+      } catch (e) {
+        profile = null;
+      }
       fireAuth();
     });
   }
@@ -129,9 +159,9 @@ const GymSync = (() => {
     user = null; profile = null; lastSyncResult = null; fireAuth();
   }
 
-  // Push the WHOLE local state up to the cloud.
+  // ── Push state to the username-based path (always the same location) ──
   async function pushState(state) {
-    if (!configured || !user) {
+    if (!configured || !user || !profile || !profile.username) {
       lastSyncResult = { ok: false, time: Date.now(), error: 'Not signed in' };
       return;
     }
@@ -139,7 +169,7 @@ const GymSync = (() => {
       const data = {
         workouts: state.workouts || [],
         logs: state.logs || [],
-        username: state.username || '',
+        username: state.username || profile.username,
         friends: state.friends || [],
         volumeGoal: state.volumeGoal || 0,
         exerciseNotes: state.exerciseNotes || {},
@@ -148,6 +178,9 @@ const GymSync = (() => {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAtMs: Date.now()
       };
+      // Write to username-based path (shared across devices)
+      await getUsernameDataRef(profile.username).set(data);
+      // Also write to UID-based path for backward compatibility
       await db.collection('users').doc(user.uid).collection('state').doc('data').set(data);
       lastSyncResult = { ok: true, time: Date.now() };
     } catch (e) {
@@ -156,32 +189,31 @@ const GymSync = (() => {
     }
   }
 
+  // ── Pull state from username-based path ──
   async function pullState() {
     if (!configured || !user) return null;
     try {
+      // Try username-based path first
+      if (profile && profile.username) {
+        const doc = await getUsernameDataRef(profile.username).get();
+        const data = extractData(doc);
+        if (data) return data;
+      }
+      // Fall back to UID-based path
       const doc = await db.collection('users').doc(user.uid).collection('state').doc('data').get();
-      if (!doc.exists) return null;
-      const d = doc.data();
-      return {
-        workouts: d.workouts || [],
-        logs: d.logs || [],
-        username: d.username || '',
-        friends: d.friends || [],
-        volumeGoal: d.volumeGoal || 0,
-        exerciseNotes: d.exerciseNotes || {},
-        bodyMeasurements: d.bodyMeasurements || [],
-        customExercises: d.customExercises || []
-      };
+      return extractData(doc);
     } catch (e) {
       lastSyncResult = { ok: false, time: Date.now(), error: e.message };
       return null;
     }
   }
 
-  // Realtime: keeps every open device in sync automatically.
+  // ── Realtime subscription ──
   function subscribeState(cb) {
     if (!configured || !user) return () => {};
     if (stateUnsub) stateUnsub();
+    // Subscribe to UID-based path (Firebase Realtime doesn't work well with
+    // username-based paths because the user might not own that path)
     stateUnsub = db.collection('users').doc(user.uid).collection('state').doc('data')
       .onSnapshot(doc => { if (doc.exists) cb(doc.data()); });
     return stateUnsub;
@@ -216,10 +248,16 @@ const GymSync = (() => {
     const friends = await listFriends();
     const results = await Promise.all(friends.map(async f => {
       try {
+        // Try reading from friend's username path first
+        if (f.username) {
+          const doc = await getUsernameDataRef(f.username).get();
+          const d = extractData(doc);
+          if (d) return { ...f, ...d };
+        }
+        // Fall back to UID path
         const doc = await db.collection('users').doc(f.uid).collection('state').doc('data').get();
-        if (!doc.exists) return { ...f, workouts: [], logs: [] };
-        const d = doc.data();
-        return { ...f, workouts: d.workouts || [], logs: d.logs || [] };
+        const d = extractData(doc);
+        return { ...f, ...(d || { workouts: [], logs: [] }) };
       } catch { return { ...f, workouts: [], logs: [], error: true }; }
     }));
     return results;
