@@ -1028,19 +1028,80 @@ function initSocial(){
       msg.textContent=`Signed in as ${result.profile.username}!`;
       msg.style.color='var(--ink)';
       
-      // Merge cloud data: cloud data ALWAYS wins (it's the source of truth)
-      // This ensures data is restored on any device, even if local state has data
+      // Merge cloud data: merge intelligently, never remove workouts or logs.
+      // Cloud adds what local doesn't have; local keeps what cloud doesn't.
+      // This prevents data loss when cloud snapshot is incomplete.
       function mergeCloudData(cd){
         if(!cd)return;
-        if(cd.workouts&&cd.workouts.length)state.workouts=cd.workouts;
-        if(cd.logs&&cd.logs.length)state.logs=cd.logs;
-        if(cd.exerciseNotes&&Object.keys(cd.exerciseNotes).length)state.exerciseNotes={...state.exerciseNotes,...cd.exerciseNotes};
-        if(cd.bodyMeasurements&&cd.bodyMeasurements.length)state.bodyMeasurements=cd.bodyMeasurements;
-        if(cd.friends&&cd.friends.length)state.friends=cd.friends;
-        if(cd.volumeGoal)state.volumeGoal=cd.volumeGoal;
-        if(cd.customExercises&&cd.customExercises.length)state.customExercises=cd.customExercises;
+        if(cd.workouts&&cd.workouts.length){
+          // Merge: add cloud workouts not already in local
+          const localIds=new Set(state.workouts.map(w=>w.id));
+          const newWorkouts=[...state.workouts];
+          cd.workouts.forEach(cw=>{
+            if(!localIds.has(cw.id))newWorkouts.push(cw);
+          });
+          state.workouts=newWorkouts;
+        }
+        if(cd.logs&&cd.logs.length){
+          // Merge logs similarly (avoid duplicate IDs)
+          const localLogIds=new Set(state.logs.map(l=>l.id));
+          const newLogs=[...state.logs];
+          cd.logs.forEach(cl=>{
+            if(!localLogIds.has(cl.id))newLogs.push(cl);
+          });
+          state.logs=newLogs;
+        }
+        if(cd.exerciseNotes&&Object.keys(cd.exerciseNotes).length)state.exerciseNotes={...cd.exerciseNotes,...state.exerciseNotes};
+        if(cd.bodyMeasurements&&cd.bodyMeasurements.length){
+          const localMeasDates=new Set(state.bodyMeasurements.map(m=>m.date));
+          cd.bodyMeasurements.forEach(cm=>{
+            if(!localMeasDates.has(cm.date))state.bodyMeasurements.push(cm);
+          });
+        }
+        if(cd.friends&&cd.friends.length){
+          cd.friends.forEach(f=>{if(!state.friends.includes(f))state.friends.push(f);});
+        }
+        if(cd.volumeGoal&&!state.volumeGoal)state.volumeGoal=cd.volumeGoal;
+        if(cd.customExercises&&cd.customExercises.length){
+          const localCustomIds=new Set(state.customExercises?.map(e=>e.id)||[]);
+          cd.customExercises.forEach(ce=>{
+            if(!localCustomIds.has(ce.id)){
+              if(!state.customExercises)state.customExercises=[];
+              state.customExercises.push(ce);
+            }
+          });
+        }
         save();
       }
+      
+      // ── Repair: if workouts from a plan are missing, regenerate them ──
+      function repairMissingPlanWorkouts(){
+        // Find workouts that came from a plan
+        const sourceWorkouts=state.workouts.filter(w=>w.source);
+        if(!sourceWorkouts.length)return;
+        const sourceName=sourceWorkouts[0].source;
+        const plan=PLANS.find(p=>p.name===sourceName);
+        if(!plan)return;
+        // Check which plan days are missing from our workouts
+        const existingNames=new Set(sourceWorkouts.map(w=>w.name));
+        let added=false;
+        plan.days.forEach(d=>{
+          const expectedName=`${plan.name} · ${d[0]}`;
+          if(!existingNames.has(expectedName)){
+            // This workout is missing — regenerate it
+            const exercises=d[1].map(ex=>{
+              if(Array.isArray(ex)) return {id:byName(ex[0]),prescription:ex[1]};
+              return {id:byName(ex)};
+            });
+            state.workouts.push({id:uid(),name:expectedName,exercises,source:plan.name});
+            added=true;
+          }
+        });
+        if(added)save();
+      }
+      
+      // Run repair after merge
+      repairMissingPlanWorkouts();
       
       // Always merge cloud data first (username-based path)
       if(result.cloudData){
