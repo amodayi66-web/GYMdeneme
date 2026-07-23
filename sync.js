@@ -31,6 +31,8 @@ const GymSync = (() => {
   }
 
   // Claim a display username (unique, case-insensitive) for the signed-in uid.
+  // Returns { profile, cloudData } — cloudData is the old data if this username
+  // was previously used on another device, so the caller can merge it.
   async function claimUsername(username) {
     if (!configured) throw new Error('Sync is not configured yet.');
     const clean = username.trim();
@@ -38,19 +40,45 @@ const GymSync = (() => {
     const authedUser = await ensureSignedIn();
     const key = clean.toLowerCase();
     const nameRef = db.collection('usernames').doc(key);
+    
+    let oldUid = null;
+    let cloudData = null;
+    
     await db.runTransaction(async tx => {
       const doc = await tx.get(nameRef);
-      // Allow reclaim: if username exists, reassign uid to current user (sign-in)
-      // This lets users sign back in on a new device by re-entering their username.
+      if (doc.exists) {
+        oldUid = doc.data().uid;
+        // If the username is already claimed by a different UID, we need to
+        // migrate the data from the old UID to the new UID.
+        if (oldUid !== authedUser.uid) {
+          // Read old data outside transaction (Firestore doesn't allow reads
+          // from arbitrary docs inside a transaction)
+        }
+      }
       tx.set(nameRef, { uid: authedUser.uid, username: clean });
       tx.set(db.collection('users').doc(authedUser.uid), {
         username: clean, usernameLower: key, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     });
+    
+    // If the username was previously used by a different UID, migrate the data
+    if (oldUid && oldUid !== authedUser.uid) {
+      try {
+        const oldDoc = await db.collection('users').doc(oldUid).collection('state').doc('data').get();
+        if (oldDoc.exists) {
+          cloudData = oldDoc.data();
+          // Copy old data to new UID
+          await db.collection('users').doc(authedUser.uid).collection('state').doc('data').set(cloudData);
+        }
+      } catch (e) {
+        console.error('Failed to migrate old data:', e);
+      }
+    }
+    
     user = authedUser;
     profile = { username: clean, uid: authedUser.uid };
     fireAuth();
-    return profile;
+    return { profile, cloudData };
   }
 
   async function restoreProfile() {

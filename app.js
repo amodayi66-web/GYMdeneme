@@ -11,6 +11,24 @@ const fmt=n=>new Intl.NumberFormat().format(n);
 const uid=()=>`${Date.now()}${Math.random().toString(16).slice(2)}`;
 const esc=s=>s.replace(/[&<>"']/g,c=>({'&':'&','<':'<','>':'>','"':'"',"'":'&#39;'}[c]));
 
+// ── Custom exercises (user-created, stored in state) ──
+function getCustomExercises(){
+  return state.customExercises||[];
+}
+function addCustomExercise(name){
+  if(!state.customExercises)state.customExercises=[];
+  const id='custom_'+uid();
+  state.customExercises.push({id,name,category:'Custom',muscles:['Other']});
+  save();
+  return id;
+}
+function getAllExercises(){
+  return [...EX,...getCustomExercises()];
+}
+function findExercise(id){
+  return byId(id)||getCustomExercises().find(e=>e.id===id);
+}
+
 function save(send=true){
   localStorage.setItem(STORE,JSON.stringify(state));
   if(send&&chan)chan.postMessage(state);
@@ -45,6 +63,38 @@ function head(title,sub){
   return `<div class="eyebrow">SIMPLE GYM APP</div><h1>${title}</h1>${sub?`<p class="intro">${sub}</p>`:''}`;
 }
 
+// ── Program week tracking ──
+function getProgramProgress(){
+  if(!state.workouts.length)return null;
+  // Find the source program
+  const sourceWorkouts=state.workouts.filter(w=>w.source);
+  if(!sourceWorkouts.length)return null;
+  const sourceName=sourceWorkouts[0].source;
+  const plan=PLANS.find(p=>p.name===sourceName);
+  if(!plan)return null;
+  // Parse duration like "8 weeks" or "12 weeks"
+  const weeksMatch=plan.duration.match(/(\d+)\s*weeks?/i);
+  if(!weeksMatch)return null;
+  const totalWeeks=parseInt(weeksMatch[1]);
+  // Count completed workouts that belong to this program
+  const completedIds=new Set(state.logs.map(l=>l.workout));
+  const completedWorkouts=sourceWorkouts.filter(w=>completedIds.has(w.id));
+  // Each week has plan.sessionsPerWeek workouts (or days.length*2)
+  const sessionsPerWeek=plan.sessionsPerWeek||Math.min(plan.days.length*2,6);
+  const completedSessions=completedWorkouts.length;
+  const currentWeek=Math.min(Math.floor(completedSessions/sessionsPerWeek)+1,totalWeeks);
+  return {currentWeek,totalWeeks,completedSessions,totalSessions:totalWeeks*sessionsPerWeek,sessionsPerWeek};
+}
+
+function getProgramProgressBar(){
+  const prog=getProgramProgress();
+  if(!prog)return '';
+  const pct=Math.round((prog.completedSessions/prog.totalSessions)*100);
+  const filled=Math.round(pct/10);
+  const empty=10-filled;
+  return `<div class="program-progress"><div class="eyebrow">PROGRAM PROGRESS</div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-weight:700">Week ${prog.currentWeek} of ${prog.totalWeeks}</span><span style="font:10px 'DM Mono',monospace">${pct}%</span></div><div class="prog-bar-track"><div class="prog-bar-fill" style="width:${pct}%"></div></div><div style="font:9px 'DM Mono',monospace;color:#666;margin-top:4px">${prog.completedSessions} / ${prog.totalSessions} sessions</div></div>`;
+}
+
 function getNextWorkout(){
   if(!state.workouts.length)return null;
   const completedIds=new Set(state.logs.map(l=>l.workout));
@@ -55,10 +105,10 @@ function getNextWorkout(){
 }
 
 function getSimilarExercises(exerciseId){
-  const ex=byId(exerciseId);
+  const ex=findExercise(exerciseId);
   if(!ex)return [];
   const exMuscles=new Set(ex.muscles);
-  return EX.filter(e=>e.id!==ex.id&&
+  return getAllExercises().filter(e=>e.id!==ex.id&&
     e.muscles.length===ex.muscles.length&&
     e.muscles.every(m=>exMuscles.has(m))
   ).slice(0,5);
@@ -90,13 +140,15 @@ function getAutoProgression(exerciseId,weight,reps){
 
 function home(){
   const nextW=getNextWorkout();
+  const progBar=getProgramProgressBar();
   return `<section class="hero">${head('A plan that fits you.','Choose a guided plan for your level or build a simple workout from the gym movements you enjoy.')}</section>
   ${nextW?`<div style="border:var(--line);background:var(--sun);padding:18px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
     <div><div class="eyebrow">NEXT WORKOUT</div><h2 style="font-size:22px;letter-spacing:-1px;margin:4px 0 0">${esc(nextW.name)}</h2></div>
     <a class="button" href="#/log/${nextW.id}">Start next workout →</a>
   </div>`:''}
+  ${progBar?`<div style="margin-bottom:24px">${progBar}</div>`:''}
   <section><div class="section-head"><div><div class="eyebrow">YOUR WORKOUTS</div><h2>My plan</h2></div><a class="button mint" href="#/templates">Choose a plan →</a></div>
-  ${state.workouts.length?`<div class="workout-grid">${state.workouts.map((w,i)=>`<a href="#/workout/${w.id}" class="workout-card"><small>${String(i+1).padStart(2,'0')} / ${w.exercises.length} exercises</small><h2>${esc(w.name)}</h2><p>${w.exercises.slice(0,3).map(x=>{const e=byId(getExId(x));return e?e.name:'?'}).join(' · ')}${w.exercises.length>3?' · …':''}</p><div class="card-foot"><span>OPEN WORKOUT</span><span>↗</span></div></a>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
+  ${state.workouts.length?`<div class="workout-grid">${state.workouts.map((w,i)=>`<a href="#/workout/${w.id}" class="workout-card"><small>${String(i+1).padStart(2,'0')} / ${w.exercises.length} exercises</small><h2>${esc(w.name)}</h2><p>${w.exercises.slice(0,3).map(x=>{const e=findExercise(getExId(x));return e?e.name:'?'}).join(' · ')}${w.exercises.length>3?' · …':''}</p><div class="card-foot"><span>OPEN WORKOUT</span><span>↗</span></div></a>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
 }
 
 let level='All';
@@ -144,6 +196,11 @@ function builder(){
     <div class="eyebrow" style="margin-bottom:6px">Equipment</div>
     <div id="equip-filters" class="filter-row compact"></div>
     <div id="exercise-list" class="exercise-list"></div>
+    <button class="button white small" id="custom-ex-builder" style="margin-top:8px">+ Custom Exercise</button>
+    <div id="custom-ex-builder-input" style="display:none;margin-top:8px;border:2px solid var(--ink);padding:8px;background:var(--mint)">
+      <input id="custom-ex-name" class="text-input" placeholder="Exercise name (e.g. Safety Bar Squat)" style="margin-bottom:6px">
+      <button class="button small" id="save-custom-ex-builder">Add to selection →</button>
+    </div>
   </section><aside class="selection">
     <div class="eyebrow">YOUR SELECTION</div>
     <h2><span id="count">0</span> exercises</h2>
@@ -154,7 +211,7 @@ function builder(){
 }
 
 function renderBuilder(){
-  let choices=EX.filter(e=>{
+  let choices=getAllExercises().filter(e=>{
     if(searchQuery&&!e.name.toLowerCase().includes(searchQuery.toLowerCase()))return false;
     if(muscleFilter!=='All'&&!e.muscles.includes(muscleFilter))return false;
     if(category!=='All'&&e.category!==category)return false;
@@ -166,7 +223,7 @@ function renderBuilder(){
   $('#equip-filters').innerHTML=['All',...equip].map(x=>`<button class="filter ${x===category?'active':''}" data-category="${x}">${x}</button>`).join('');
   $('#exercise-list').innerHTML=choices.map(e=>`<button class="exercise-item ${selected.includes(e.id)?'selected':''}" data-exercise="${e.id}"><b>${e.name}</b><small>${e.category} · ${e.muscles.join(', ')}</small></button>`).join('');
   $('#count').textContent=selected.length;
-  $('#selected-list').innerHTML=selected.length?selected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-move-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-move-down="${x}" ${i===selected.length-1?'disabled':''}>▼</button></span>${byId(x).name}<button class="remove" data-remove="${x}">×</button></li>`).join(''):'<li>Choose exercises to begin.</li>';
+  $('#selected-list').innerHTML=selected.length?selected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-move-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-move-down="${x}" ${i===selected.length-1?'disabled':''}>▼</button></span>${findExercise(x)?.name||'?'}<button class="remove" data-remove="${x}">×</button></li>`).join(''):'<li>Choose exercises to begin.</li>';
 }
 
 function getExId(x){
@@ -181,7 +238,7 @@ function workout(id){
   if(!w)return home();
   return `<a class="back" href="#/">← My plan</a>
   <div class="session-head"><div>${head(esc(w.name),`${w.exercises.length} movements. Keep the session simple and focused.`)}</div><a class="button" href="#/log/${w.id}">Start session →</a></div>
-  <div class="workout-grid">${w.exercises.map(x=>{let e=byId(getExId(x));if(!e)return '';const pres=getExPrescription(x);return `<article class="workout-card"><small>${e.category.toUpperCase()}</small><h2>${e.name}</h2><p>${e.muscles.join(' · ')}</p>${pres?`<div class="prescription">${esc(pres)}</div>`:''}<div class="card-foot"><span>WORKING MUSCLES</span></div></article>`}).join('')}</div>
+  <div class="workout-grid">${w.exercises.map(x=>{let e=findExercise(getExId(x));if(!e)return '';const pres=getExPrescription(x);return `<article class="workout-card"><small>${e.category.toUpperCase()}</small><h2>${e.name}</h2><p>${e.muscles.join(' · ')}</p>${pres?`<div class="prescription">${esc(pres)}</div>`:''}<div class="card-foot"><span>WORKING MUSCLES</span></div></article>`}).join('')}</div>
   <div style="display:flex;gap:12px;margin-top:30px;flex-wrap:wrap">
     <a class="button mint" href="#/edit/${w.id}">✎ Edit workout</a>
     <button class="button white" data-delete="${w.id}">Delete workout</button>
@@ -229,6 +286,11 @@ function log(id){
     <div class="eyebrow" style="margin-bottom:8px">Search exercises to add</div>
     <input id="add-ex-search" class="search-input" placeholder="Search..." style="margin-bottom:8px">
     <div id="add-ex-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;max-height:200px;overflow-y:auto"></div>
+    <button class="button white small" id="custom-ex-add-btn" style="margin-top:6px">+ Custom Exercise</button>
+    <div id="custom-ex-add-input" style="display:none;margin-top:6px;border:2px solid var(--ink);padding:8px;background:#fff">
+      <input id="custom-ex-add-name" class="text-input" placeholder="Exercise name" style="margin-bottom:4px">
+      <button class="button small" id="save-custom-ex-add">Add →</button>
+    </div>
   </div>
   <div class="timer-section">
     <div class="timer-label">WORKOUT DURATION</div>
@@ -242,7 +304,6 @@ function log(id){
       <button data-rest="90" class="active">90s</button>
       <button data-rest="120">120s</button>
       <button data-rest="150">150s</button>
-      <button data-rest="180">180s</button>
       <input id="custom-rest" type="number" placeholder="Custom" inputmode="numeric" style="width:60px;border:2px solid var(--ink);padding:4px;font:10px 'DM Mono',monospace;text-align:center">
     </div>
     <div class="rest-status ready" id="rest-status">Ready</div>
@@ -251,7 +312,7 @@ function log(id){
   <div id="reorder-mode-hint" style="display:none;background:var(--sun);border:2px solid var(--ink);padding:8px 12px;font:10px 'DM Mono',monospace;margin-bottom:12px">Reorder mode: use ▲▼ to move exercises, then press Done.</div>
   <div class="log-layout"><section id="log-section">${w.exercises.map((x, exIndex)=>{
     const exId=getExId(x);
-    let e=byId(exId);
+    let e=findExercise(exId);
     if(!e)return '';
     const pres=getExPrescription(x);
     const prev=GymAnalytics.getPreviousExerciseData(state.logs,exId);
@@ -272,6 +333,11 @@ function log(id){
       <div class="swap-options" style="display:none;background:#fff;border:2px solid var(--ink);padding:8px;margin-top:4px;position:relative">
         <input class="swap-search" placeholder="Search exercises..." style="width:100%;border:1px solid #ccc;padding:6px;font-size:11px;margin-bottom:6px;box-sizing:border-box">
         <div class="swap-list" style="max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:2px"></div>
+        <button class="button white small" style="margin-top:4px;font-size:10px" id="custom-ex-swap-btn">+ Custom Exercise</button>
+        <div id="custom-ex-swap-input" style="display:none;margin-top:4px;border:2px solid var(--ink);padding:6px;background:var(--mint)">
+          <input id="custom-ex-swap-name" class="text-input" placeholder="Exercise name" style="margin-bottom:4px;font-size:11px">
+          <button class="button small" style="font-size:10px" id="save-custom-ex-swap">Add →</button>
+        </div>
       </div>
       <small>${e.muscles.join(' · ')}</small>
       ${pres?`<div class="prescription">${esc(pres)}</div>`:''}
@@ -368,7 +434,7 @@ function updateAutoProgression(){
     const bestSet=workingSets.reduce((a,b)=>(b.reps*b.weight)>(a.reps*a.weight)?b:a);
     const prog=getAutoProgression(exId,bestSet.weight,bestSet.reps);
     if(prog){
-      const ex=byId(exId);
+      const ex=findExercise(exId);
       suggestions.push(`<div class="prog-item"><b>${ex?ex.name:'Unknown'}</b>: ${prog.reason}</div>`);
     }
   });
@@ -403,7 +469,7 @@ function summary(id){
   <h1>Work done.</h1><p class="intro">${esc(w?.name||'Workout')} has been saved to this device.</p>
   <div class="summary-stats"><div><b>${fmt(r)}</b><span>TOTAL REPS</span></div><div><b>${fmt(v)} kg</b><span>VOLUME</span></div><div><b>${s.length}</b><span>WORKING SETS</span></div></div>
   ${Object.entries(l.sets).map(([x,a])=>{
-    const ex=byId(x);
+    const ex=findExercise(x);
     const working=a.filter(s=>!s.warmup);
     if(!working.length)return '';
     const exVol=working.reduce((z,q)=>z+q.reps*q.weight,0);
@@ -425,19 +491,20 @@ function summary(id){
 
 let progressTab='overview';
 function progress(){
-  // Check sync status for sync button
   const isSignedIn=GymSync.isSignedIn();
   const isConfigured=GymSync.isConfigured();
   const syncStatus=GymSync.getSyncStatus();
   let syncBtnHtml='';
+  let syncErrorHtml='';
   if(isConfigured&&isSignedIn){
-    if(syncStatus&&syncStatus.ok&&syncStatus.time){
-      syncBtnHtml=`<button class="button small white" id="sync-now-btn">☁ Sync now</button>`;
-    } else {
-      syncBtnHtml=`<button class="button small white" id="sync-now-btn" style="background:var(--sun)">⏳ Sync now</button>`;
+    syncBtnHtml=`<button class="button small white" id="sync-now-btn">☁ Sync now</button>`;
+    if(syncStatus&&syncStatus.error){
+      syncErrorHtml=`<div style="background:var(--orange);border:2px solid var(--ink);padding:8px 12px;margin-top:8px;font:10px 'DM Mono',monospace;color:#fff">⚠ Sync error: ${esc(syncStatus.error)}</div>`;
     }
   }
-  return `<div class="progress-head" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">${head('Your progress.','Track your volume, records, and weekly trends.')}<div id="sync-progress-area">${syncBtnHtml}</div></div>
+  const progBar=getProgramProgressBar();
+  return `<div class="progress-head" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">${head('Your progress.','Track your volume, records, and weekly trends.')}<div id="sync-progress-area">${syncBtnHtml}${syncErrorHtml}</div></div>
+  ${progBar?`<div style="margin-bottom:16px">${progBar}</div>`:''}
   <div class="progress-tabs">
     <button class="progress-tab ${progressTab==='overview'?'active':''}" data-tab="overview">Overview</button>
     <button class="progress-tab ${progressTab==='weekly'?'active':''}" data-tab="weekly">Weekly Report</button>
@@ -642,6 +709,11 @@ function bind(){
       if(e.target.dataset.moveDown){const id=e.target.dataset.moveDown;const idx=selected.indexOf(id);if(idx<selected.length-1){[selected[idx],selected[idx+1]]=[selected[idx+1],selected[idx]];renderBuilder();}}
     };
     $('#save-workout').onclick=()=>{let n=$('#workout-name').value.trim(),m=$('#message');if(!n)return m.textContent='Give your workout a name.';if(!selected.length)return m.textContent='Choose at least one exercise.';let w={id:uid(),name:n,exercises:selected};state.workouts.push(w);save();selected=[];location.hash=`#/workout/${w.id}`;};
+    // Custom exercise in builder
+    const customExBtn=$('#custom-ex-builder');
+    if(customExBtn)customExBtn.onclick=()=>{const inp=$('#custom-ex-builder-input');if(inp)inp.style.display=inp.style.display==='none'?'block':'none';};
+    const saveCustomEx=$('#save-custom-ex-builder');
+    if(saveCustomEx)saveCustomEx.onclick=()=>{const name=$('#custom-ex-name')?.value.trim();if(!name)return;const id=addCustomExercise(name);selected.push(id);renderBuilder();$('#custom-ex-name').value='';$('#custom-ex-builder-input').style.display='none';};
   }
   document.querySelectorAll('[data-delete]').forEach(b=>b.onclick=()=>{state.workouts=state.workouts.filter(x=>x.id!==b.dataset.delete);save();location.hash='#/';});
   const showPrs=$('#show-all-prs');
@@ -673,6 +745,7 @@ function initProgress(){
       this.style.background='var(--orange)';
       setTimeout(()=>{this.textContent='☁ Sync now';this.style.background='';},2000);
     }
+    updateSyncStatus();
   };
 }
 
@@ -741,9 +814,15 @@ function initLog(){
       if(this.value&&parseFloat(this.value)>0)maybeStartRest(setRowEl);
       updateTotals(); updateCardState(this.closest('.log-card'));
     };
-    if(weight)weight.oninput=function(){
+    // ── Fix: use onchange instead of oninput for weight auto-fill ──
+    if(weight)weight.onchange=function(){
       markCompletedInput(this);
       if(setIndex===0)autoFillWeight(this);
+      updateTotals(); updateCardState(this.closest('.log-card'));
+    };
+    // Also keep oninput for real-time totals update but without auto-fill
+    if(weight)weight.oninput=function(){
+      markCompletedInput(this);
       updateTotals(); updateCardState(this.closest('.log-card'));
     };
   }
@@ -753,12 +832,12 @@ function initLog(){
   function renderSwapOptions(card, exId, query){
     const list=card.querySelector('.swap-list');
     if(!list)return;
-    const choices=EX.filter(e=>{if(e.id===exId)return false;if(query&&!e.name.toLowerCase().includes(query.toLowerCase()))return false;return true;}).slice(0,20);
+    const choices=getAllExercises().filter(e=>{if(e.id===exId)return false;if(query&&!e.name.toLowerCase().includes(query.toLowerCase()))return false;return true;}).slice(0,20);
     list.innerHTML=choices.map(e=>`<button class="swap-option" data-swap-from="${exId}" data-swap-to="${e.id}" style="text-align:left;padding:4px 6px;font:10px 'DM Mono',monospace;border:0;border-bottom:1px solid #eee;cursor:pointer">${esc(e.name)}</button>`).join('')||'<span style="font-size:10px;color:#999">No exercises found.</span>';
     list.querySelectorAll('.swap-option').forEach(btn=>{btn.onclick=function(){
       const from=this.dataset.swapFrom, to=this.dataset.swapTo;
       const wid=getWid(); const w=state.workouts.find(x=>x.id===wid);
-      if(w){const idx=w.exercises.findIndex(x=>getExId(x)===from);if(idx!==-1){w.exercises[idx]=to;save();render();}} // Use render() not initLog()
+      if(w){const idx=w.exercises.findIndex(x=>getExId(x)===from);if(idx!==-1){w.exercises[idx]=to;save();render();}}
     };});}
   
   document.querySelectorAll('.log-card').forEach(card=>{
@@ -788,7 +867,7 @@ function initLog(){
       if(!overlay||!list)return;
       const wid=getWid(); const w=state.workouts.find(x=>x.id===wid);
       if(!w)return;
-      list.innerHTML=w.exercises.filter(x=>getExId(x)!==exId).map(x=>{const e=byId(getExId(x));return e?`<button class="filter" data-superset-pair="${exId}" data-superset-with="${getExId(x)}" style="text-align:left">${esc(e.name)}</button>`:'';}).join('')||'<p style="font-size:12px;color:#666">No other exercises available.</p>';
+      list.innerHTML=w.exercises.filter(x=>getExId(x)!==exId).map(x=>{const e=findExercise(getExId(x));return e?`<button class="filter" data-superset-pair="${exId}" data-superset-with="${getExId(x)}" style="text-align:left">${esc(e.name)}</button>`:'';}).join('')||'<p style="font-size:12px;color:#666">No other exercises available.</p>';
       overlay.style.display='flex';
       list.querySelectorAll('[data-superset-pair]').forEach(btn=>{btn.onclick=function(){
         const from=this.dataset.supersetPair, to=this.dataset.supersetWith;
@@ -820,6 +899,35 @@ function initLog(){
   });
   
   document.querySelectorAll('.swap-search').forEach(inp=>{inp.oninput=function(){const card=this.closest('.log-card');if(!card)return;renderSwapOptions(card, card.dataset.exercise, this.value);};});
+  
+  // ── Custom exercise in swap ──
+  const customSwapBtn=$('#custom-ex-swap-btn');
+  if(customSwapBtn)customSwapBtn.onclick=()=>{const inp=$('#custom-ex-swap-input');if(inp)inp.style.display=inp.style.display==='none'?'block':'none';};
+  const saveCustomSwap=$('#save-custom-ex-swap');
+  if(saveCustomSwap)saveCustomSwap.onclick=()=>{
+    const name=$('#custom-ex-swap-name')?.value.trim();
+    if(!name)return;
+    const id=addCustomExercise(name);
+    // Find the card that has this swap panel open
+    const card=document.querySelector('.swap-options[style*="block"]')?.closest('.log-card');
+    if(card){
+      const exId=card.dataset.exercise;
+      const wid=getWid(); const w=state.workouts.find(x=>x.id===wid);
+      if(w){const idx=w.exercises.findIndex(x=>getExId(x)===exId);if(idx!==-1){w.exercises[idx]=id;save();render();}}
+    }
+  };
+  
+  // ── Custom exercise in add panel ──
+  const customAddBtn=$('#custom-ex-add-btn');
+  if(customAddBtn)customAddBtn.onclick=()=>{const inp=$('#custom-ex-add-input');if(inp)inp.style.display=inp.style.display==='none'?'block':'none';};
+  const saveCustomAdd=$('#save-custom-ex-add');
+  if(saveCustomAdd)saveCustomAdd.onclick=()=>{
+    const name=$('#custom-ex-add-name')?.value.trim();
+    if(!name)return;
+    const id=addCustomExercise(name);
+    const wid=getWid(); const w=state.workouts.find(x=>x.id===wid);
+    if(w){w.exercises.push(id);save();render();}
+  };
   
   // ── Fix: use event delegation for remove-superset (dynamic elements) ──
   document.querySelector('#log-section')?.addEventListener('click', function(e){
@@ -860,7 +968,7 @@ function initLog(){
   
   document.querySelectorAll('.log-card-header h2').forEach(h2=>h2.onclick=function(){
     const card=this.closest('.log-card'); if(!card)return;
-    const exId=card.dataset.exercise, ex=byId(exId); if(!ex)return;
+    const exId=card.dataset.exercise, ex=findExercise(exId); if(!ex)return;
     const allLogs=state.logs.filter(l=>l.sets&&l.sets[exId]), allSets=allLogs.flatMap(l=>l.sets[exId].filter(s=>!s.warmup));
     const bestVolume=allSets.reduce((a,b)=>(b.reps*b.weight)>(a.reps*a.weight)?b:a,{reps:0,weight:0});
     let html=`<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" onclick="this.remove()"><div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:440px;width:90%;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()"><h2 style="font-size:24px;letter-spacing:-1px;margin:0 0 4px">${esc(ex.name)}</h2><p style="font:10px 'DM Mono',monospace;color:#666;margin:0 0 16px">${ex.muscles.join(' · ')}</p>`;
@@ -874,7 +982,6 @@ function initLog(){
   document.querySelectorAll('.log-card').forEach(card=>{
     const exId=card.dataset.exercise, header=card.querySelector('.log-card-header');
     if(!header||!exId)return;
-    // Skip if note button already exists
     if(header.querySelector('.note-btn'))return;
     const note=getExerciseNote(exId);
     const noteBtn=document.createElement('button'); noteBtn.className='note-btn'; noteBtn.textContent='📝'; noteBtn.title=note||'Add note';
@@ -891,7 +998,7 @@ function initLog(){
   const addExBtn=$('#add-exercise-btn'), addExPanel=$('#add-exercise-panel');
   if(addExBtn&&addExPanel){addExBtn.onclick=()=>{const shown=addExPanel.style.display!=='none';addExPanel.style.display=shown?'none':'block';if(!shown)renderAddExerciseList('');};}
   const addExSearch=$('#add-ex-search'); if(addExSearch)addExSearch.oninput=function(){renderAddExerciseList(this.value);};
-  const addExList=$('#add-ex-list'); if(addExList){addExList.onclick=function(e){const btn=e.target.closest('[data-add-ex]');if(!btn)return;const exId=btn.dataset.addEx;if(!byId(exId))return;const wid=getWid();const w=state.workouts.find(x=>x.id===wid);if(w){w.exercises.push(exId);save();render();}};} // Use render() not initLog()
+  const addExList=$('#add-ex-list'); if(addExList){addExList.onclick=function(e){const btn=e.target.closest('[data-add-ex]');if(!btn)return;const exId=btn.dataset.addEx;if(!findExercise(exId))return;const wid=getWid();const w=state.workouts.find(x=>x.id===wid);if(w){w.exercises.push(exId);save();render();}};}
   
   const finish=$('[data-finish]');
   if(finish)finish.onclick=()=>{
@@ -909,8 +1016,51 @@ function initLog(){
 
 function initSocial(){
   const setBtn=$('#set-username-btn');
-  if(setBtn)setBtn.onclick=async()=>{const input=$('#username-input'), msg=$('#username-msg');if(!input||!msg)return;const name=input.value.trim();if(!name)return msg.textContent='Enter a username.';try{const profile=await GymSync.claimUsername(name);state.username=profile.username;save();msg.textContent=`Signed in as${profile.username}!`;msg.style.color='var(--ink)';// Pull cloud data first to avoid overwriting with empty state
-const cloudData=await GymSync.pullState();if(cloudData&&(cloudData.workouts?.length||cloudData.logs?.length)){if(cloudData.workouts?.length&&!state.workouts.length)state.workouts=cloudData.workouts;if(cloudData.logs?.length&&!state.logs.length)state.logs=cloudData.logs;if(cloudData.exerciseNotes&&Object.keys(cloudData.exerciseNotes).length)state.exerciseNotes={...cloudData.exerciseNotes,...state.exerciseNotes};if(cloudData.bodyMeasurements?.length)state.bodyMeasurements=cloudData.bodyMeasurements;save();}await GymSync.pushState(state);setTimeout(()=>render(),800);}catch(e){msg.textContent=e.message;msg.style.color='#c00';}};
+  if(setBtn)setBtn.onclick=async()=>{
+    const input=$('#username-input'), msg=$('#username-msg');
+    if(!input||!msg)return;
+    const name=input.value.trim();
+    if(!name)return msg.textContent='Enter a username.';
+    try{
+      const result=await GymSync.claimUsername(name);
+      state.username=result.profile.username;
+      save();
+      msg.textContent=`Signed in as ${result.profile.username}!`;
+      msg.style.color='var(--ink)';
+      
+      // If cloudData was returned (migrated from old UID), merge it
+      if(result.cloudData){
+        const cd=result.cloudData;
+        if(cd.workouts&&cd.workouts.length&&!state.workouts.length)state.workouts=cd.workouts;
+        if(cd.logs&&cd.logs.length&&!state.logs.length)state.logs=cd.logs;
+        if(cd.exerciseNotes&&Object.keys(cd.exerciseNotes).length)state.exerciseNotes={...cd.exerciseNotes,...state.exerciseNotes};
+        if(cd.bodyMeasurements&&cd.bodyMeasurements.length)state.bodyMeasurements=cd.bodyMeasurements;
+        if(cd.friends&&cd.friends.length)state.friends=cd.friends;
+        if(cd.volumeGoal)state.volumeGoal=cd.volumeGoal;
+        save();
+      } else {
+        // No migration happened, try pullState
+        const cloudData=await GymSync.pullState();
+        if(cloudData&&(cloudData.workouts?.length||cloudData.logs?.length)){
+          if(cloudData.workouts?.length&&!state.workouts.length)state.workouts=cloudData.workouts;
+          if(cloudData.logs?.length&&!state.logs.length)state.logs=cloudData.logs;
+          if(cloudData.exerciseNotes&&Object.keys(cloudData.exerciseNotes).length)state.exerciseNotes={...cloudData.exerciseNotes,...state.exerciseNotes};
+          if(cloudData.bodyMeasurements?.length)state.bodyMeasurements=cloudData.bodyMeasurements;
+          if(cloudData.friends?.length)state.friends=cloudData.friends;
+          if(cloudData.volumeGoal)state.volumeGoal=cloudData.volumeGoal;
+          save();
+        }
+      }
+      
+      // Push current state to cloud
+      await GymSync.pushState(state);
+      updateSyncStatus();
+      setTimeout(()=>render(),800);
+    }catch(e){
+      msg.textContent=e.message;
+      msg.style.color='#c00';
+    }
+  };
   const addBtn=$('#add-friend-btn');
   if(addBtn)addBtn.onclick=async()=>{const input=$('#friend-input');if(!input)return;const name=input.value.trim();if(!name)return;if(!state.friends)state.friends=[];if(state.friends.includes(name))return;try{await GymSync.addFriend(name);state.friends.push(name);save();input.value='';render();setTimeout(loadFriendFeed,50);}catch(e){const msg=$('#username-msg');if(msg){msg.textContent=e.message;msg.style.color='#c00';}}};
   const friendsList=$('#friends-list');
@@ -933,12 +1083,12 @@ async function loadFriendFeed(){
       const totalReps=workingLogs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((r,s)=>r+s.reps,0),0);
       const sessionCount=workingLogs.length;
       const allExIds=new Set(); workingLogs.forEach(l=>Object.keys(l.sets||{}).forEach(exId=>allExIds.add(exId)));
-      const muscleTags=[...new Set([...allExIds].flatMap(exId=>{const e=byId(exId);return e?e.muscles:[]}))].slice(0,5);
+      const muscleTags=[...new Set([...allExIds].flatMap(exId=>{const e=findExercise(exId);return e?e.muscles:[]}))].slice(0,5);
       const sortedLogs=workingLogs.slice().reverse(); const latest=sortedLogs[0]; const restLogs=sortedLogs.slice(1);
       const latestWName=latest?workouts.find(w=>w.id===latest.workout)?.name||'Workout':'';
       const latestSets=latest?Object.entries(latest.sets||{}).flatMap(([exId,sets])=>sets.filter(s=>!s.warmup).map(s=>({...s,exId}))):[];
       const latestVol=latestSets.reduce((a,s)=>a+s.reps*s.weight,0), latestReps=latestSets.reduce((a,s)=>a+s.reps,0);
-      const grouped={}; latestSets.forEach(s=>{const ex=byId(s.exId);const name=ex?ex.name:'Unknown';if(!grouped[name])grouped[name]=[];grouped[name].push(s);});
+      const grouped={}; latestSets.forEach(s=>{const ex=findExercise(s.exId);const name=ex?ex.name:'Unknown';if(!grouped[name])grouped[name]=[];grouped[name].push(s);});
       let html=`<div class="friend-card"><div class="card-header"><div class="username">@${esc(friendName)}</div><div class="total-sessions"><strong>${sessionCount}</strong> sessions</div></div>`;
       if(latest){
         html+=`<div class="routine-title-row"><h2 class="routine-name">${esc(latestWName)}</h2><div class="total-weight"><strong>${fmt(totalVol)}</strong> kg total</div></div><div class="workout-date">${latest.date}</div><hr class="divider"><div class="overview-metrics"><div class="metric-box"><div class="metric-value">${fmt(latestVol)}</div><div class="metric-label">kg vol</div></div><div class="metric-box"><div class="metric-value">${fmt(latestReps)}</div><div class="metric-label">reps</div></div><div class="metric-box"><div class="metric-value">${latestSets.length}</div><div class="metric-label">sets</div></div></div>`;
@@ -956,7 +1106,7 @@ async function loadFriendFeed(){
 
 function renderAddExerciseList(query){
   const container=$('#add-ex-list'); if(!container)return;
-  const choices=EX.filter(e=>!query||e.name.toLowerCase().includes(query.toLowerCase())).slice(0,30);
+  const choices=getAllExercises().filter(e=>!query||e.name.toLowerCase().includes(query.toLowerCase())).slice(0,30);
   container.innerHTML=choices.map(e=>`<button class="filter" data-add-ex="${e.id}" style="text-align:left;font-size:11px">${esc(e.name)}</button>`).join('');
 }
 
@@ -972,9 +1122,14 @@ function editWorkout(id){
     <div class="eyebrow" style="margin-bottom:6px">Muscle group</div><div id="edit-muscle-filters" class="filter-row compact"></div>
     <div class="eyebrow" style="margin-bottom:6px">Equipment</div><div id="edit-equip-filters" class="filter-row compact"></div>
     <div id="edit-exercise-list" class="exercise-list"></div>
+    <button class="button white small" id="edit-custom-ex-btn" style="margin-top:8px">+ Custom Exercise</button>
+    <div id="edit-custom-ex-input" style="display:none;margin-top:8px;border:2px solid var(--ink);padding:8px;background:var(--mint)">
+      <input id="edit-custom-ex-name" class="text-input" placeholder="Exercise name" style="margin-bottom:6px">
+      <button class="button small" id="save-edit-custom-ex">Add →</button>
+    </div>
   </section><aside class="selection">
     <div class="eyebrow">EXERCISES IN WORKOUT</div><h2><span id="edit-count">${allExIds.length}</span> exercises</h2>
-    <ol id="edit-selected-list" class="selected-list">${allExIds.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-edit-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-edit-down="${x}" ${i===allExIds.length-1?'disabled':''}>▼</button></span>${byId(x).name}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('')}</ol>
+    <ol id="edit-selected-list" class="selected-list">${allExIds.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-edit-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-edit-down="${x}" ${i===allExIds.length-1?'disabled':''}>▼</button></span>${findExercise(x)?.name||'?'}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('')}</ol>
     <button id="save-edit-workout" class="button">Save changes →</button><p id="edit-message" class="message"></p>
   </aside></div>`;
 }
@@ -983,12 +1138,12 @@ let editSelected=[],editCategory='All',editMuscleFilter='All',editSearchQuery=''
 function renderEditBuilder(){
   let wId=location.hash.split('/')[2], w=state.workouts.find(x=>x.id===wId); if(!w)return;
   editSelected=[...w.exercises];
-  let choices=EX.filter(e=>{if(editSearchQuery&&!e.name.toLowerCase().includes(editSearchQuery.toLowerCase()))return false;if(editMuscleFilter!=='All'&&!e.muscles.includes(editMuscleFilter))return false;if(editCategory!=='All'&&e.category!==editCategory)return false;return true;});
+  let choices=getAllExercises().filter(e=>{if(editSearchQuery&&!e.name.toLowerCase().includes(editSearchQuery.toLowerCase()))return false;if(editMuscleFilter!=='All'&&!e.muscles.includes(editMuscleFilter))return false;if(editCategory!=='All'&&e.category!==editCategory)return false;return true;});
   const muscles=getMuscleGroups(); const mf=$('#edit-muscle-filters'); if(mf)mf.innerHTML=['All',...muscles].map(x=>`<button class="filter ${x===editMuscleFilter?'active':''}" data-edit-muscle="${x}">${x}</button>`).join('');
   const equip=getEquipmentTypes(); const ef=$('#edit-equip-filters'); if(ef)ef.innerHTML=['All',...equip].map(x=>`<button class="filter ${x===editCategory?'active':''}" data-edit-category="${x}">${x}</button>`).join('');
   const el=$('#edit-exercise-list'); if(el)el.innerHTML=choices.map(e=>`<button class="exercise-item ${editSelected.includes(e.id)?'selected':''}" data-edit-exercise="${e.id}"><b>${e.name}</b><small>${e.category} · ${e.muscles.join(', ')}</small></button>`).join('');
   const ec=$('#edit-count'); if(ec)ec.textContent=editSelected.length;
-  const sl=$('#edit-selected-list'); if(sl)sl.innerHTML=editSelected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-edit-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-edit-down="${x}" ${i===editSelected.length-1?'disabled':''}>▼</button></span>${String(i+1).padStart(2,'0')} · ${byId(x).name}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('');
+  const sl=$('#edit-selected-list'); if(sl)sl.innerHTML=editSelected.map((x,i)=>`<li><span class="reorder-btns"><button class="move-up" data-edit-up="${x}" ${i===0?'disabled':''}>▲</button><button class="move-down" data-edit-down="${x}" ${i===editSelected.length-1?'disabled':''}>▼</button></span>${String(i+1).padStart(2,'0')} · ${findExercise(x)?.name||'?'}<button class="remove" data-edit-remove="${x}">×</button></li>`).join('');
 }
 function initEditWorkout(){
   renderEditBuilder();
@@ -1002,6 +1157,11 @@ function initEditWorkout(){
     if(e.target.dataset.editDown){const id=e.target.dataset.editDown;const idx=editSelected.indexOf(id);if(idx<editSelected.length-1){[editSelected[idx],editSelected[idx+1]]=[editSelected[idx+1],editSelected[idx]];renderEditBuilder();}}
   };
   const saveBtn=$('#save-edit-workout'); if(saveBtn)saveBtn.onclick=()=>{const name=$('#edit-workout-name')?.value.trim(),msg=$('#edit-message');if(!name)return msg.textContent='Give your workout a name.';if(!editSelected.length)return msg.textContent='Choose at least one exercise.';const wId=location.hash.split('/')[2];const w=state.workouts.find(x=>x.id===wId);if(w){w.name=name;w.exercises=editSelected;save();location.hash=`#/workout/${wId}`;}};
+  // Custom exercise in edit
+  const customEditBtn=$('#edit-custom-ex-btn');
+  if(customEditBtn)customEditBtn.onclick=()=>{const inp=$('#edit-custom-ex-input');if(inp)inp.style.display=inp.style.display==='none'?'block':'none';};
+  const saveEditCustom=$('#save-edit-custom-ex');
+  if(saveEditCustom)saveEditCustom.onclick=()=>{const name=$('#edit-custom-ex-name')?.value.trim();if(!name)return;const id=addCustomExercise(name);editSelected.push(id);renderEditBuilder();$('#edit-custom-ex-name').value='';$('#edit-custom-ex-input').style.display='none';};
 }
 
 window.onhashchange=render;
