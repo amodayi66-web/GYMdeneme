@@ -15,13 +15,14 @@ const GymSync = (() => {
     firebase.initializeApp(cfg);
     auth = firebase.auth();
     db = firebase.firestore();
+    // Enable offline persistence so writes queue up even if offline
+    db.enablePersistence().catch(() => {});
   }
 
   function onAuth(cb) { listeners.auth.push(cb); if (user !== null) cb(user, profile); }
   function fireAuth() { listeners.auth.forEach(cb => cb(user, profile)); }
 
   function getSyncStatus() { return lastSyncResult; }
-  function onSyncStatusChange(cb) { /* caller can poll or listen */ }
 
   async function ensureSignedIn() {
     if (!configured) return null;
@@ -30,9 +31,9 @@ const GymSync = (() => {
     return cred.user;
   }
 
-  // Claim a display username (unique, case-insensitive) for the signed-in uid.
-  // Returns { profile, cloudData } — cloudData is the old data if this username
-  // was previously used on another device, so the caller can merge it.
+  // Claim a display username. If the username already exists, we do NOT
+  // reassign it — instead we read the existing data and return it so the
+  // caller can merge it locally. This prevents data loss when switching devices.
   async function claimUsername(username) {
     if (!configured) throw new Error('Sync is not configured yet.');
     const clean = username.trim();
@@ -41,38 +42,66 @@ const GymSync = (() => {
     const key = clean.toLowerCase();
     const nameRef = db.collection('usernames').doc(key);
     
-    let oldUid = null;
+    let existingUid = null;
     let cloudData = null;
     
-    await db.runTransaction(async tx => {
-      const doc = await tx.get(nameRef);
-      if (doc.exists) {
-        oldUid = doc.data().uid;
-        // If the username is already claimed by a different UID, we need to
-        // migrate the data from the old UID to the new UID.
-        if (oldUid !== authedUser.uid) {
-          // Read old data outside transaction (Firestore doesn't allow reads
-          // from arbitrary docs inside a transaction)
-        }
-      }
-      tx.set(nameRef, { uid: authedUser.uid, username: clean });
-      tx.set(db.collection('users').doc(authedUser.uid), {
-        username: clean, usernameLower: key, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-    });
+    // Check if username already exists
+    const existingDoc = await nameRef.get();
     
-    // If the username was previously used by a different UID, migrate the data
-    if (oldUid && oldUid !== authedUser.uid) {
+    if (existingDoc.exists) {
+      // Username is taken — read data from the existing UID
+      existingUid = existingDoc.data().uid;
+      
+      // Try to read state data from the existing UID
       try {
-        const oldDoc = await db.collection('users').doc(oldUid).collection('state').doc('data').get();
-        if (oldDoc.exists) {
-          cloudData = oldDoc.data();
-          // Copy old data to new UID
-          await db.collection('users').doc(authedUser.uid).collection('state').doc('data').set(cloudData);
+        const stateDoc = await db.collection('users').doc(existingUid).collection('state').doc('data').get();
+        if (stateDoc.exists) {
+          const d = stateDoc.data();
+          cloudData = {
+            workouts: d.workouts || [],
+            logs: d.logs || [],
+            username: d.username || clean,
+            friends: d.friends || [],
+            volumeGoal: d.volumeGoal || 0,
+            exerciseNotes: d.exerciseNotes || {},
+            bodyMeasurements: d.bodyMeasurements || []
+          };
         }
       } catch (e) {
-        console.error('Failed to migrate old data:', e);
+        console.error('Failed to read existing data:', e);
       }
+      
+      // Also write our UID to the username doc so the username
+      // can be found from any device (multi-device support)
+      // We keep the original uid as the "primary" but add our uid
+      await nameRef.set({
+        uid: existingUid,  // Keep original as primary
+        uids: firebase.firestore.FieldValue.arrayUnion(authedUser.uid),
+        username: clean,
+        lastAccessed: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+      
+      // Write our profile
+      await db.collection('users').doc(authedUser.uid).set({
+        username: clean,
+        usernameLower: key,
+        linkedTo: existingUid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    } else {
+      // Username is free — claim it
+      await nameRef.set({
+        uid: authedUser.uid,
+        uids: [authedUser.uid],
+        username: clean,
+        lastAccessed: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      
+      await db.collection('users').doc(authedUser.uid).set({
+        username: clean,
+        usernameLower: key,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
     }
     
     user = authedUser;
@@ -107,7 +136,6 @@ const GymSync = (() => {
       return;
     }
     try {
-      // Save ALL state fields, not just workouts+logs
       const data = {
         workouts: state.workouts || [],
         logs: state.logs || [],
@@ -116,6 +144,7 @@ const GymSync = (() => {
         volumeGoal: state.volumeGoal || 0,
         exerciseNotes: state.exerciseNotes || {},
         bodyMeasurements: state.bodyMeasurements || [],
+        customExercises: state.customExercises || [],
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAtMs: Date.now()
       };
@@ -133,7 +162,6 @@ const GymSync = (() => {
       const doc = await db.collection('users').doc(user.uid).collection('state').doc('data').get();
       if (!doc.exists) return null;
       const d = doc.data();
-      // Filter out server-only fields
       return {
         workouts: d.workouts || [],
         logs: d.logs || [],
@@ -141,7 +169,8 @@ const GymSync = (() => {
         friends: d.friends || [],
         volumeGoal: d.volumeGoal || 0,
         exerciseNotes: d.exerciseNotes || {},
-        bodyMeasurements: d.bodyMeasurements || []
+        bodyMeasurements: d.bodyMeasurements || [],
+        customExercises: d.customExercises || []
       };
     } catch (e) {
       lastSyncResult = { ok: false, time: Date.now(), error: e.message };
@@ -182,7 +211,6 @@ const GymSync = (() => {
     return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
   }
 
-  // Latest completed session for each friend, for the Friends feed page.
   async function friendsFeed() {
     if (!configured || !user) return [];
     const friends = await listFriends();

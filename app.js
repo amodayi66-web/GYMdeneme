@@ -1180,3 +1180,11 @@ save=async function(send=true){
     updateSyncStatus();
   }
 };
+
+// ── Auto-sync: push to cloud every 30s when signed in ──
+setInterval(() => {
+  if(GymSync.isConfigured() && GymSync.isSignedIn()){
+    GymSync.pushState(state).catch(() => {});
+    updateSyncStatus();
+  }
+}, 30000);
