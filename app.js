@@ -1084,24 +1084,43 @@ function initSocial(){
         if(!plan)return;
         // Check which plan days are missing from our workouts
         const existingNames=new Set(sourceWorkouts.map(w=>w.name));
-        // Build a map: name → id from logs, in case the old workout ID was lost
-        // but a log still references it by name
-        const logWorkoutIds=new Map();
+        const existingIds=new Set(sourceWorkouts.map(w=>w.id));
+        // Build a map: name → id from orphaned logs (logs whose workout ID
+        // doesn't match any existing workout). These are logs from a previous
+        // sync where the workout was lost.
+        const orphanedLogIds=new Map();
         state.logs.forEach(l=>{
-          const w=state.workouts.find(x=>x.id===l.workout);
-          if(w)logWorkoutIds.set(w.name, l.workout);
+          if(!existingIds.has(l.workout)){
+            // This log references a workout we don't have anymore
+            // Try to match it to a plan day by checking if the exercises
+            // in the log match the exercises in the plan day
+            const logExIds=new Set(Object.keys(l.sets||{}));
+            plan.days.forEach(d=>{
+              const expectedName=`${plan.name} · ${d[0]}`;
+              const planExIds=new Set(d[1].map(ex=>byName(Array.isArray(ex)?ex[0]:ex)));
+              // Check if at least 2 plan exercises match the log
+              let matches=0;
+              logExIds.forEach(le=>{if(planExIds.has(le))matches++;});
+              if(matches>=2&&!orphanedLogIds.has(expectedName)){
+                orphanedLogIds.set(expectedName, l.workout);
+              }
+            });
+          } else {
+            // Log matches a known workout — map name to ID
+            const w=state.workouts.find(x=>x.id===l.workout);
+            if(w&&!orphanedLogIds.has(w.name))orphanedLogIds.set(w.name, l.workout);
+          }
         });
         let added=false;
         plan.days.forEach(d=>{
           const expectedName=`${plan.name} · ${d[0]}`;
           if(!existingNames.has(expectedName)){
-            // Check if a log references this workout by name (from old data)
-            const oldId=logWorkoutIds.get(expectedName);
+            // Reuse old ID if found in orphaned logs, otherwise generate new
+            const oldId=orphanedLogIds.get(expectedName);
             const exercises=d[1].map(ex=>{
               if(Array.isArray(ex)) return {id:byName(ex[0]),prescription:ex[1]};
               return {id:byName(ex)};
             });
-            // Reuse the old ID if it exists, so logs still match
             state.workouts.push({id:oldId||uid(),name:expectedName,exercises,source:plan.name});
             added=true;
           }
