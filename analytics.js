@@ -4,22 +4,18 @@
 const GymAnalytics = (() => {
   'use strict';
 
-  // Get total volume (reps × weight) for a set
   const setVolume = s => (s.reps || 0) * (s.weight || 0);
 
-  // Get all sets from logs
   const allSets = logs => logs.flatMap(l => 
     Object.entries(l.sets || {}).flatMap(([exId, sets]) => 
-      sets.map(s => ({ ...s, exerciseId: exId, date: l.date, logId: l.id }))
+      sets.map(s => ({ ...s, exerciseId: exId, date: l.date, logId: l.id, workoutId: l.workout }))
     )
   );
 
   // ── Muscle Group Stats ─────────────────────────────────────────────────
-  // Returns { muscleName: totalVolume, ... }
   function getMuscleGroupStats(logs) {
-    const sets = allSets(logs);
+    const sets = allSets(logs).filter(s => !s.warmup);
     const stats = {};
-    
     sets.forEach(s => {
       const ex = byId(s.exerciseId);
       if (!ex) return;
@@ -28,18 +24,60 @@ const GymAnalytics = (() => {
         stats[m] = (stats[m] || 0) + vol;
       });
     });
-
-    // Sort by volume descending
     return Object.entries(stats)
       .sort((a, b) => b[1] - a[1])
       .reduce((acc, [k, v]) => { acc[k] = v; return acc; }, {});
   }
 
-  // ── Personal Records ───────────────────────────────────────────────────
-  // Returns [{ exerciseId, exerciseName, reps, weight, volume, date }, ...]
-  function getPersonalRecords(logs) {
-    const sets = allSets(logs);
+  // ── Muscle Group Working Sets ──────────────────────────────────────────
+  function getMuscleGroupSets(logs) {
+    const sets = allSets(logs).filter(s => !s.warmup);
+    const stats = {};
+    sets.forEach(s => {
+      const ex = byId(s.exerciseId);
+      if (!ex) return;
+      ex.muscles.forEach(m => {
+        stats[m] = (stats[m] || 0) + 1;
+      });
+    });
+    return Object.entries(stats)
+      .sort((a, b) => b[1] - a[1])
+      .reduce((acc, [k, v]) => { acc[k] = v; return acc; }, {});
+  }
+
+  // ── Muscle Group Training Frequency (days per week) ────────────────────
+  function getMuscleFrequency(logs, weekStart) {
+    const weekLogs = logs.filter(l => {
+      const d = new Date(l.date);
+      if (isNaN(d.getTime())) return false;
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff)).toISOString().slice(0, 10);
+      return monday === weekStart;
+    });
+    const freq = {};
+    weekLogs.forEach(l => {
+      Object.keys(l.sets || {}).forEach(exId => {
+        const ex = byId(exId);
+        if (!ex) return;
+        ex.muscles.forEach(m => {
+          if (!freq[m]) freq[m] = new Set();
+          freq[m].add(l.date);
+        });
+      });
+    });
+    const result = {};
+    Object.entries(freq).forEach(([m, dates]) => {
+      result[m] = dates.size;
+    });
+    return result;
+  }
+
+  // ── Personal Records by Muscle Group ───────────────────────────────────
+  function getPersonalRecordsByGroup(logs) {
+    const sets = allSets(logs).filter(s => !s.warmup);
     const records = {};
+    const groups = {};
 
     sets.forEach(s => {
       const ex = byId(s.exerciseId);
@@ -54,70 +92,38 @@ const GymAnalytics = (() => {
           reps: s.reps,
           weight: s.weight,
           volume: vol,
-          date: s.date
+          date: s.date,
+          muscles: ex.muscles
         };
       }
     });
 
-    return Object.values(records).sort((a, b) => b.volume - a.volume);
-  }
-
-  // ── Weekly Stats ───────────────────────────────────────────────────────
-  // Returns [{ weekStart, volume, reps, sets, count }, ...]
-  function getWeeklyStats(logs) {
-    const weekMap = {};
-
-    logs.forEach(l => {
-      // Parse date or use current
-      const d = new Date(l.date);
-      if (isNaN(d.getTime())) return;
-      
-      // Get Monday of the week
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
-      const weekKey = monday.toISOString().slice(0, 10);
-      
-      if (!weekMap[weekKey]) {
-        weekMap[weekKey] = { weekStart: weekKey, volume: 0, reps: 0, sets: 0, count: 0 };
-      }
-      
-      const entry = weekMap[weekKey];
-      entry.count++;
-      
-      Object.values(l.sets || {}).forEach(sets => {
-        sets.forEach(s => {
-          entry.reps += s.reps || 0;
-          entry.volume += setVolume(s);
-          entry.sets++;
-        });
-      });
+    // Group by primary muscle
+    Object.values(records).forEach(r => {
+      const primary = r.muscles[0] || 'Other';
+      if (!groups[primary]) groups[primary] = [];
+      groups[primary].push(r);
     });
 
-    return Object.values(weekMap).sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+    // Sort groups by muscle name, sort records by volume
+    const sorted = {};
+    Object.keys(groups).sort().forEach(m => {
+      sorted[m] = groups[m].sort((a, b) => b.volume - a.volume);
+    });
+    return sorted;
   }
 
-  // ── Muscle Radar Data ──────────────────────────────────────────────────
-  // Returns [{ muscle, volume }, ...] sorted for radar/spider charts
-  function getMuscleRadarData(logs) {
-    const stats = getMuscleGroupStats(logs);
-    return Object.entries(stats).map(([muscle, volume]) => ({
-      muscle,
-      volume
-    }));
-  }
-
-  // ── Estimated 1RM (Epley formula) ──────────────────────────────────────
+  // ── Estimated 1RM by Muscle Group ──────────────────────────────────────
   function estimate1RM(reps, weight) {
     if (!reps || !weight || reps < 1) return 0;
     if (reps === 1) return weight;
     return Math.round(weight * (1 + reps / 30));
   }
 
-  // ── Best 1RM per exercise ──────────────────────────────────────────────
-  function getBestEstimated1RM(logs) {
-    const sets = allSets(logs);
+  function getBestEstimated1RMByGroup(logs) {
+    const sets = allSets(logs).filter(s => !s.warmup);
     const best = {};
+    const groups = {};
 
     sets.forEach(s => {
       const ex = byId(s.exerciseId);
@@ -131,19 +137,72 @@ const GymAnalytics = (() => {
           estimated1RM: est,
           reps: s.reps,
           weight: s.weight,
-          date: s.date
+          date: s.date,
+          muscles: ex.muscles
         };
       }
     });
 
-    return Object.values(best).sort((a, b) => b.estimated1RM - a.estimated1RM);
+    Object.values(best).forEach(r => {
+      const primary = r.muscles[0] || 'Other';
+      if (!groups[primary]) groups[primary] = [];
+      groups[primary].push(r);
+    });
+
+    const sorted = {};
+    Object.keys(groups).sort().forEach(m => {
+      sorted[m] = groups[m].sort((a, b) => b.estimated1RM - a.estimated1RM);
+    });
+    return sorted;
+  }
+
+  // ── Weekly Stats ───────────────────────────────────────────────────────
+  function getWeeklyStats(logs) {
+    const weekMap = {};
+    logs.forEach(l => {
+      const d = new Date(l.date);
+      if (isNaN(d.getTime())) return;
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff));
+      const weekKey = monday.toISOString().slice(0, 10);
+      
+      if (!weekMap[weekKey]) {
+        weekMap[weekKey] = { weekStart: weekKey, volume: 0, reps: 0, sets: 0, count: 0, exercises: new Set(), muscleGroups: new Set() };
+      }
+      
+      const entry = weekMap[weekKey];
+      entry.count++;
+      
+      Object.entries(l.sets || {}).forEach(([exId, sets]) => {
+        const ex = byId(exId);
+        if (ex) {
+          entry.exercises.add(ex.name);
+          ex.muscles.forEach(m => entry.muscleGroups.add(m));
+        }
+        sets.forEach(s => {
+          if (!s.warmup) {
+            entry.reps += s.reps || 0;
+            entry.volume += setVolume(s);
+            entry.sets++;
+          }
+        });
+      });
+    });
+
+    return Object.values(weekMap)
+      .sort((a, b) => a.weekStart.localeCompare(b.weekStart))
+      .map(w => ({
+        ...w,
+        exercises: [...w.exercises],
+        muscleGroups: [...w.muscleGroups]
+      }));
   }
 
   // ── Streak (weekly) ────────────────────────────────────────────────────
   function getStreak(logs) {
     if (!logs.length) return 0;
     
-    // Get unique weeks from logs
     const weeks = new Set();
     logs.forEach(l => {
       const d = new Date(l.date);
@@ -157,14 +216,10 @@ const GymAnalytics = (() => {
     const sortedWeeks = [...weeks].sort().reverse();
     if (!sortedWeeks.length) return 0;
 
-    // Check if current week is included
-    const now = new Date();
-    const todayDay = now.getDay();
-    const todayDiff = now.getDate() - todayDay + (todayDay === 0 ? -6 : 1);
-    const thisMonday = new Date(now.setDate(todayDiff)).toISOString().slice(0, 10);
-    
+    // Get the most recent week that has a log
+    const latestWeek = sortedWeeks[0];
     let streak = 0;
-    let checkDate = new Date(thisMonday);
+    let checkDate = new Date(latestWeek);
     
     for (let i = 0; i < sortedWeeks.length; i++) {
       const expected = checkDate.toISOString().slice(0, 10);
@@ -181,10 +236,8 @@ const GymAnalytics = (() => {
 
   // ── Previous workout data for a specific exercise ──────────────────────
   function getPreviousExerciseData(logs, exerciseId) {
-    const sets = allSets(logs).filter(s => s.exerciseId === exerciseId);
+    const sets = allSets(logs).filter(s => s.exerciseId === exerciseId && !s.warmup);
     if (!sets.length) return null;
-    
-    // Get the most recent log's sets for this exercise
     const lastSet = sets[sets.length - 1];
     return {
       reps: lastSet.reps,
@@ -194,20 +247,58 @@ const GymAnalytics = (() => {
     };
   }
 
-  // ── Session volume goal progress ───────────────────────────────────────
+  // ── Get all previous sessions for an exercise (for history table) ──────
+  function getExerciseHistory(logs, exerciseId) {
+    const logEntries = logs.filter(l => l.sets && l.sets[exerciseId]);
+    return logEntries.map(l => ({
+      date: l.date,
+      sets: l.sets[exerciseId].filter(s => !s.warmup),
+      warmup: l.sets[exerciseId].filter(s => s.warmup),
+      logId: l.id
+    })).reverse();
+  }
+
+  // ── Session volume ─────────────────────────────────────────────────────
   function getSessionVolume(sets) {
     return Object.values(sets || {}).flat().reduce((sum, s) => sum + setVolume(s), 0);
   }
 
+  // ── Get logs for a specific week ───────────────────────────────────────
+  function getLogsForWeek(logs, weekStart) {
+    return logs.filter(l => {
+      const d = new Date(l.date);
+      if (isNaN(d.getTime())) return false;
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(d.setDate(diff)).toISOString().slice(0, 10);
+      return monday === weekStart;
+    });
+  }
+
+  // ── Get week number for a program ──────────────────────────────────────
+  function getWeekNumber(logs, workouts, plan) {
+    if (!plan || !logs.length) return null;
+    const sourceWorkouts = workouts.filter(w => w.source === plan.name);
+    if (!sourceWorkouts.length) return null;
+    const completedIds = new Set(logs.map(l => l.workout));
+    const completedSessions = sourceWorkouts.filter(w => completedIds.has(w.id)).length;
+    const sessionsPerWeek = plan.sessionsPerWeek || Math.min(plan.days.length * 2, 6);
+    return Math.floor(completedSessions / sessionsPerWeek) + 1;
+  }
+
   return {
     getMuscleGroupStats,
-    getPersonalRecords,
-    getWeeklyStats,
-    getMuscleRadarData,
+    getMuscleGroupSets,
+    getMuscleFrequency,
+    getPersonalRecordsByGroup,
+    getBestEstimated1RMByGroup,
     estimate1RM,
-    getBestEstimated1RM,
+    getWeeklyStats,
     getStreak,
     getPreviousExerciseData,
-    getSessionVolume
+    getExerciseHistory,
+    getSessionVolume,
+    getLogsForWeek,
+    getWeekNumber
   };
 })();

@@ -109,5 +109,33 @@
 .prog-bar-track{height:6px;background:#e0e0e0;border:1px solid var(--ink);position:relative;border-radius:0}
 .prog-bar-fill{height:100%;background:var(--ink);transition:width .3s ease;border-radius:0}
 
+/* ── Workout History Page ─────────────────────────────────────────────── */
+.history-page{padding:0 0 30px}
+.week-block{border:var(--line);background:#fff;margin-bottom:20px;box-shadow:var(--shadow)}
+.week-block-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--sun);border-bottom:var(--line)}
+.history-session{border-bottom:2px solid var(--ink);padding:16px}
+.history-session:last-child{border-bottom:0}
+.history-session-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+.history-exercise-list{display:grid;grid-template-columns:1fr;gap:4px}
+.history-exercise{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:6px 8px;background:var(--paper);border:1px solid #eee}
+.history-exercise:nth-child(odd){background:#fff7df}
+.history-exercise-name{font-size:12px;font-weight:700}
+.history-exercise-sets{display:flex;gap:4px;flex-wrap:wrap}
+.history-set{font:9px 'DM Mono',monospace;background:var(--sun);padding:2px 5px;border:1px solid var(--ink)}
+.history-exercise-vol{font:9px 'DM Mono',monospace;font-weight:700;text-align:right;min-width:50px}
+
+/* ── Log page reorder controls ── */
+.reorder-controls{display:flex;gap:4px;margin-left:auto}
+.reorder-controls button{border:1px solid var(--ink);background:var(--paper);font-size:10px;padding:2px 6px;cursor:pointer;line-height:1}
+.reorder-controls button:hover{background:var(--sun)}
+.reorder-controls button:disabled{opacity:0.3;cursor:default}
+
 /* Responsive */
 @media(max-width:800px){.topbar{display:none}body{padding-top:0}main{padding:40px 18px 92px}.hero h1,.template-intro h1,.builder-head h1,.session-head h1{font-size:44px}.workout-grid,.template-grid,.exercise-list,.log-layout,.builder,.progress-grid,.report-stats,.measure-form,.measure-grid,.daily-breakdown{grid-template-columns:1fr}.section-head,.builder-head,.session-head,.report-header{display:block}.section-head .button,.session-head .button{margin-top:16px}.selection,.totals{position:static;order:-1}.template-card h2{font-size:25px}.mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:66px;z-index:20;background:var(--ink);align-items:center;justify-content:space-around}.mobile-nav a{color:white;font:10px 'DM Mono',monospace}.summary-stats{grid-template-columns:1fr}.progress-card .stat{flex-wrap:wrap}}
+
+/* ── Mobile: move totals to bottom ── */
+@media(max-width:800px){
+  .log-layout{display:flex;flex-direction:column}
+  .log-layout .totals{order:2;margin-top:20px}
+  .log-layout #log-section{order:1}
+}

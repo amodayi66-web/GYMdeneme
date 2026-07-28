@@ -326,6 +326,10 @@ function log(id){
       <div class="log-card-header">
         <span class="reorder-handle" style="display:none;cursor:grab;font-size:12px;margin-right:4px">⠿</span>
         <h2>${e.name}</h2>
+        <div class="reorder-controls" style="display:none">
+          <button class="move-ex-up" data-exercise="${exId}" ${exIndex===0?'disabled':''}>▲</button>
+          <button class="move-ex-down" data-exercise="${exId}" ${exIndex===w.exercises.length-1?'disabled':''}>▼</button>
+        </div>
         <button class="superset-btn" data-exercise="${exId}" title="Superset" style="border:0;background:var(--lilac);padding:2px 6px;font:9px 'DM Mono',monospace;font-weight:700;cursor:pointer;border:1px solid var(--ink);margin-left:auto">⧉ SS</button>
         <button class="swap-btn" data-exercise="${exId}" title="Swap" style="border:0;background:var(--paper);padding:2px 6px;font:9px 'DM Mono',monospace;cursor:pointer;border:1px solid var(--ink);margin-left:4px">↔</button>
         <button class="delete-ex-btn" data-exercise="${exId}" title="Remove" style="border:0;background:none;font-size:16px;cursor:pointer;margin-left:4px;padding:0 4px;color:#c00">×</button>
@@ -503,59 +507,69 @@ function progress(){
     }
   }
   const progBar=getProgramProgressBar();
-  return `<div class="progress-head" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">${head('Your progress.','Track your volume, records, and weekly trends.')}<div id="sync-progress-area">${syncBtnHtml}${syncErrorHtml}</div></div>
+  return `<div class="progress-head" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">${head('Your progress.','Track your training volume, frequency, and personal records.')}<div id="sync-progress-area">${syncBtnHtml}${syncErrorHtml}</div></div>
   ${progBar?`<div style="margin-bottom:16px">${progBar}</div>`:''}
   <div class="progress-tabs">
     <button class="progress-tab ${progressTab==='overview'?'active':''}" data-tab="overview">Overview</button>
     <button class="progress-tab ${progressTab==='weekly'?'active':''}" data-tab="weekly">Weekly Report</button>
+    <button class="progress-tab ${progressTab==='history'?'active':''}" data-tab="history">Workout History</button>
     <button class="progress-tab ${progressTab==='measurements'?'active':''}" data-tab="measurements">Body Stats</button>
     <button class="progress-tab ${progressTab==='graphs'?'active':''}" data-tab="graphs">Graphs</button>
   </div>
-  <div id="progress-content">${progressTab==='overview'?progressOverview():progressTab==='weekly'?progressWeekly():progressTab==='measurements'?progressMeasurements():progressGraphs()}</div>`;
+  <div id="progress-content">${progressTab==='overview'?progressOverview():progressTab==='weekly'?progressWeekly():progressTab==='history'?progressHistory():progressTab==='measurements'?progressMeasurements():progressGraphs()}</div>`;
 }
 
 function progressOverview(){
   const logs=state.logs;
-  const muscleStats=GymAnalytics.getMuscleGroupStats(logs);
-  const prs=GymAnalytics.getPersonalRecords(logs);
   const weekly=GymAnalytics.getWeeklyStats(logs);
-  const best1RM=GymAnalytics.getBestEstimated1RM(logs);
   const streak=GymAnalytics.getStreak(logs);
-  const totalVolume=Object.values(muscleStats).reduce((a,b)=>a+b,0);
   const totalSessions=logs.length;
+  const totalSets=logs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0);
+  const totalVolume=logs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((v,s)=>v+s.reps*s.weight,0),0);
+  
+  // Get PRs grouped by muscle
+  const prsByGroup=GymAnalytics.getPersonalRecordsByGroup(logs);
+  const hasPrs=Object.keys(prsByGroup).length>0;
+  
+  // Get 1RM grouped by muscle
+  const rmByGroup=GymAnalytics.getBestEstimated1RMByGroup(logs);
+  const hasRm=Object.keys(rmByGroup).length>0;
+  
+  // Get muscle working sets
+  const muscleSets=GymAnalytics.getMuscleGroupSets(logs);
+  const hasMuscleSets=Object.keys(muscleSets).length>0;
+  
   return `<div class="streak-badge"><span>🔥</span> ${streak} week streak</div>
   <div class="progress-grid">
     <div class="progress-card"><h3>Overview</h3>
       <div class="stat"><span>Total sessions</span><b>${totalSessions}</b></div>
       <div class="stat"><span>Total volume</span><b>${fmt(totalVolume)} kg</b></div>
-      <div class="stat"><span>Total sets logged</span><b>${logs.reduce((a,l)=>a+Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length,0)}</b></div>
+      <div class="stat"><span>Total working sets</span><b>${totalSets}</b></div>
       <div class="stat"><span>Exercises in library</span><b>${EX.length}</b></div>
     </div>
-    <div class="progress-card"><h3>Volume by Muscle Group</h3>
-      ${Object.entries(muscleStats).slice(0,10).map(([muscle,vol])=>{
-        const pct=totalVolume?Math.round((vol/totalVolume)*100):0;
+    <div class="progress-card"><h3>Working Sets by Muscle Group</h3>
+      ${hasMuscleSets?Object.entries(muscleSets).slice(0,10).map(([muscle,sets])=>{
+        const pct=totalSets?Math.round((sets/totalSets)*100):0;
         return `<div class="volume-bar"><span style="font:10px 'DM Mono',monospace;min-width:60px">${muscle}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="bar-label">${fmt(vol)} kg</span></div>`;
-      }).join('')}
-      ${Object.keys(muscleStats).length===0?'<p style="color:#999;font-size:12px">Complete a session to see muscle stats.</p>':''}
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="bar-label">${sets} sets (${pct}%)</span></div>`;
+      }).join(''):'<p style="color:#999;font-size:12px">Complete a session to see muscle stats.</p>'}
     </div>
     <div class="progress-card"><h3>Personal Records</h3>
-      ${prs.length?`<ul class="pr-list">${prs.slice(0,8).map(p=>`<li><span>${esc(p.exerciseName)}</span><b>${fmt(p.reps)} reps × ${fmt(p.weight)} kg <small>${p.date}</small></b></li>`).join('')}</ul>`:'<p style="color:#999;font-size:12px">Complete a session to see PRs.</p>'}
-      ${prs.length>8?`<a class="button small white" style="margin-top:8px" id="show-all-prs">Show all (${prs.length})</a>`:''}
+      ${hasPrs?Object.entries(prsByGroup).slice(0,6).map(([group,records])=>`
+        <div style="margin-bottom:10px"><b style="font:10px 'DM Mono',monospace;text-transform:uppercase">${group}</b>
+        ${records.slice(0,3).map(p=>`<div class="stat"><span>${esc(p.exerciseName)}</span><b>${fmt(p.reps)}×${fmt(p.weight)} kg <small>${p.date}</small></b></div>`).join('')}
+        ${records.length>3?`<div style="font:9px 'DM Mono',monospace;color:#666;text-align:right">+${records.length-3} more</div>`:''}
+        </div>`).join(''):'<p style="color:#999;font-size:12px">Complete a session to see PRs.</p>'}
     </div>
     <div class="progress-card"><h3>Estimated 1RM</h3>
-      ${best1RM.length?`<ul class="pr-list">${best1RM.slice(0,8).map(p=>`<li><span>${esc(p.exerciseName)}</span><b>${fmt(p.estimated1RM)} kg <small>${p.reps}×${p.weight}</small></b></li>`).join('')}</ul>`:'<p style="color:#999;font-size:12px">Log sets with weight to estimate 1RM.</p>'}
+      ${hasRm?Object.entries(rmByGroup).slice(0,6).map(([group,records])=>`
+        <div style="margin-bottom:10px"><b style="font:10px 'DM Mono',monospace;text-transform:uppercase">${group}</b>
+        ${records.slice(0,3).map(p=>`<div class="stat"><span>${esc(p.exerciseName)}</span><b>${fmt(p.estimated1RM)} kg <small>${p.reps}×${p.weight}</small></b></div>`).join('')}
+        ${records.length>3?`<div style="font:9px 'DM Mono',monospace;color:#666;text-align:right">+${records.length-3} more</div>`:''}
+        </div>`).join(''):'<p style="color:#999;font-size:12px">Log sets with weight to estimate 1RM.</p>'}
     </div>
     <div class="progress-card" style="grid-column:1/-1"><h3>Weekly Performance</h3>
-      ${weekly.length?`<ul class="history-list">${weekly.slice(-8).reverse().map(w=>`<li><span class="date">Week of ${w.weekStart}</span><span class="vol">${fmt(w.volume)} kg</span><span class="sets-count">${w.sets} sets · ${w.count} sessions</span></li>`).join('')}</ul>`:'<p style="color:#999;font-size:12px">Complete sessions to see weekly stats.</p>'}
-    </div>
-    <div class="progress-card" style="grid-column:1/-1"><h3>Session History</h3>
-      ${logs.length?`<ul class="history-list">${logs.slice().reverse().map(l=>{
-        const w=state.workouts.find(x=>x.id===l.workout);
-        const vol=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((a,s)=>a+s.reps*s.weight,0);
-        const sets=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length;
-        return `<li><span class="date">${l.date}${l.duration?' · '+l.duration:''}</span><span class="vol">${fmt(vol)} kg</span><span class="sets-count">${sets} sets</span></li>`;
-      }).join('')}</ul>`:'<p style="color:#999;font-size:12px">No sessions logged yet.</p>'}
+      ${weekly.length?`<ul class="history-list">${weekly.slice(-8).reverse().map(w=>`<li><span class="date">Week of ${w.weekStart}</span><span class="vol">${fmt(w.volume)} kg</span><span class="sets-count">${w.sets} sets · ${w.count} sessions · ${w.exercises.length} exercises</span></li>`).join('')}</ul>`:'<p style="color:#999;font-size:12px">Complete sessions to see weekly stats.</p>'}
     </div>
   </div>`;
 }
@@ -570,34 +584,85 @@ function progressWeekly(){
   const weekStart=latest.weekStart;
   const weekEnd=new Date(weekStart); weekEnd.setDate(weekEnd.getDate()+6);
   const weekEndStr=weekEnd.toISOString().slice(0,10);
-  const weekLogs=logs.filter(l=>{
-    const d=new Date(l.date); if(isNaN(d.getTime()))return false;
-    const day=d.getDay(); const diff=d.getDate()-day+(day===0?-6:1);
-    const monday=new Date(d.setDate(diff)).toISOString().slice(0,10);
-    return monday===weekStart;
-  });
-  const muscleStats=GymAnalytics.getMuscleGroupStats(weekLogs);
-  const totalVolume=Object.values(muscleStats).reduce((a,b)=>a+b,0);
+  const weekLogs=GymAnalytics.getLogsForWeek(logs, weekStart);
+  
+  // Muscle frequency this week
+  const muscleFreq=GymAnalytics.getMuscleFrequency(logs, weekStart);
+  const hasFreq=Object.keys(muscleFreq).length>0;
+  
+  // Muscle working sets this week
+  const muscleSets=GymAnalytics.getMuscleGroupSets(weekLogs);
+  const hasMuscleSets=Object.keys(muscleSets).length>0;
+  const totalWeekSets=Object.values(muscleSets).reduce((a,b)=>a+b,0);
+  
   return `<div class="weekly-report">
     <div class="report-header"><h2>📊 ${weekStart} — ${weekEndStr}</h2>${volChange!==null?`<div class="vol-change ${volChange>=0?'up':'down'}">${volChange>=0?'↑':'↓'} ${Math.abs(volChange)}% vs last week</div>`:''}</div>
     <div class="report-stats">
       <div class="report-stat"><b>${latest.count}</b><span>Sessions</span></div>
       <div class="report-stat"><b>${fmt(latest.volume)} kg</b><span>Volume</span></div>
-      <div class="report-stat"><b>${fmt(latest.reps)}</b><span>Reps</span></div>
-      <div class="report-stat"><b>${latest.sets}</b><span>Sets</span></div>
+      <div class="report-stat"><b>${latest.sets}</b><span>Working Sets</span></div>
+      <div class="report-stat"><b>${latest.exercises.length}</b><span>Exercises Used</span></div>
     </div>
-    <h3 style="margin:20px 0 10px;font-size:18px">Volume by Muscle Group</h3>
-    <div class="weekly-muscle-chart">${Object.entries(muscleStats).sort((a,b)=>b[1]-a[1]).map(([muscle,vol])=>{
-      const pct=totalVolume?Math.round((vol/totalVolume)*100):0;
-      return `<div class="volume-bar"><span style="font:10px 'DM Mono',monospace;min-width:60px">${muscle}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="bar-label">${fmt(vol)} kg (${pct}%)</span></div>`;
-    }).join('')}</div>
+    
+    <h3 style="margin:20px 0 10px;font-size:18px">Training Frequency (days trained per muscle)</h3>
+    ${hasFreq?`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">${Object.entries(muscleFreq).sort((a,b)=>b[1]-a[1]).map(([muscle,days])=>`<span style="border:2px solid var(--ink);background:var(--sun);padding:6px 10px;font:10px 'DM Mono',monospace;font-weight:700">${muscle}: ${days}x/week</span>`).join('')}</div>`:'<p style="color:#999;font-size:12px">No data for this week.</p>'}
+    
+    <h3 style="margin:20px 0 10px;font-size:18px">Working Sets by Muscle Group</h3>
+    ${hasMuscleSets?Object.entries(muscleSets).sort((a,b)=>b[1]-a[1]).map(([muscle,sets])=>{
+      const pct=totalWeekSets?Math.round((sets/totalWeekSets)*100):0;
+      return `<div class="volume-bar"><span style="font:10px 'DM Mono',monospace;min-width:60px">${muscle}</span><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div><span class="bar-label">${sets} sets (${pct}%)</span></div>`;
+    }).join(''):'<p style="color:#999;font-size:12px">No data for this week.</p>'}
+    
     <h3 style="margin:20px 0 10px;font-size:18px">Daily Breakdown</h3>
     <div class="daily-breakdown">${weekLogs.length?weekLogs.map(l=>{
       const w=state.workouts.find(x=>x.id===l.workout);
       const vol=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).reduce((a,s)=>a+s.reps*s.weight,0);
       const sets=Object.values(l.sets||{}).flat().filter(s=>!s.warmup).length;
-      return `<div class="daily-card"><div class="daily-date">${l.date}</div><div class="daily-name">${esc(w?.name||'Workout')}</div><div class="daily-stats"><span>${fmt(vol)} kg</span><span>${sets} sets</span>${l.duration?`<span>${l.duration}</span>`:''}</div></div>`;
+      const exCount=Object.keys(l.sets||{}).length;
+      return `<div class="daily-card"><div class="daily-date">${l.date}</div><div class="daily-name">${esc(w?.name||'Workout')}</div><div class="daily-stats"><span>${fmt(vol)} kg</span><span>${sets} sets</span><span>${exCount} exercises</span>${l.duration?`<span>${l.duration}</span>`:''}</div></div>`;
     }).join(''):'<p style="color:#999">No sessions this week.</p>'}</div></div>`;
+}
+
+function progressHistory(){
+  const logs=state.logs;
+  if(!logs.length)return '<div class="empty"><h2>No sessions logged yet.</h2><p>Complete a workout to see your full workout history.</p></div>';
+  
+  // Group logs by week
+  const weekly=GymAnalytics.getWeeklyStats(logs);
+  
+  return `<div class="history-page">
+    <h2 style="font-size:28px;letter-spacing:-1px;margin:0 0 20px">Full Workout History</h2>
+    ${weekly.slice().reverse().map(w=>{
+      const weekLogs=GymAnalytics.getLogsForWeek(logs, w.weekStart);
+      const weekEnd=new Date(w.weekStart); weekEnd.setDate(weekEnd.getDate()+6);
+      const weekEndStr=weekEnd.toISOString().slice(0,10);
+      return `<div class="week-block">
+        <div class="week-block-header"><span class="eyebrow">${w.weekStart} — ${weekEndStr}</span><span style="font:10px 'DM Mono',monospace">${w.count} sessions · ${fmt(w.volume)} kg</span></div>
+        ${weekLogs.slice().reverse().map(l=>{
+          const w=state.workouts.find(x=>x.id===l.workout);
+          const sets=Object.values(l.sets||{}).flat().filter(s=>!s.warmup);
+          const vol=sets.reduce((a,s)=>a+s.reps*s.weight,0);
+          return `<div class="history-session">
+            <div class="history-session-header">
+              <div><b style="font-size:16px">${esc(w?.name||'Workout')}</b><span style="font:10px 'DM Mono',monospace;color:#666;margin-left:8px">${l.date}${l.duration?' · '+l.duration:''}</span></div>
+              <div style="font:10px 'DM Mono',monospace;font-weight:700">${fmt(vol)} kg · ${sets.length} sets</div>
+            </div>
+            <div class="history-exercise-list">${Object.entries(l.sets||{}).map(([exId, exSets])=>{
+              const ex=findExercise(exId);
+              const working=exSets.filter(s=>!s.warmup);
+              if(!working.length)return '';
+              const exVol=working.reduce((a,s)=>a+s.reps*s.weight,0);
+              return `<div class="history-exercise">
+                <div class="history-exercise-name">${ex?ex.name:'Unknown'}</div>
+                <div class="history-exercise-sets">${working.map(s=>`<span class="history-set">${s.reps}×${s.weight} kg</span>`).join('')}</div>
+                <div class="history-exercise-vol">${fmt(exVol)} kg</div>
+              </div>`;
+            }).join('')}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function progressMeasurements(){
@@ -624,21 +689,54 @@ function progressGraphs(){
   const weekly=GymAnalytics.getWeeklyStats(logs);
   if(!weekly.length)return '<div class="empty"><h2>No data to chart yet.</h2><p>Complete a few workouts to see your trends.</p></div>';
   const maxVol=Math.max(...weekly.map(w=>w.volume));
+  const maxSets=Math.max(...weekly.map(w=>w.sets));
+  const maxSessions=Math.max(...weekly.map(w=>w.count));
   const chartHeight=200;
-  return `<div class="graphs-section"><h2>Volume Over Time</h2>
+  
+  // Calculate progressive overload: compare last 4 weeks to previous 4 weeks
+  const recent4=weekly.slice(-4);
+  const prior4=weekly.slice(-8,-4);
+  const overloadTrend=prior4.length&&recent4.length?{
+    volume: recent4.reduce((a,w)=>a+w.volume,0)/recent4.length,
+    prevVolume: prior4.reduce((a,w)=>a+w.volume,0)/prior4.length,
+    sets: recent4.reduce((a,w)=>a+w.sets,0)/recent4.length,
+    prevSets: prior4.reduce((a,w)=>a+w.sets,0)/prior4.length,
+    sessions: recent4.reduce((a,w)=>a+w.count,0)/recent4.length,
+    prevSessions: prior4.reduce((a,w)=>a+w.count,0)/prior4.length
+  }:null;
+  
+  return `<div class="graphs-section">
+    <h2>Progressive Overload Trends</h2>
+    ${overloadTrend?`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
+      <div style="border:2px solid var(--ink);padding:14px;text-align:center;background:${overloadTrend.volume>overloadTrend.prevVolume?'var(--mint)':'var(--paper)'}">
+        <div style="font:9px 'DM Mono',monospace">Avg Weekly Volume</div>
+        <div style="font-size:20px;font-weight:800">${fmt(Math.round(overloadTrend.volume))} kg</div>
+        <div style="font:9px 'DM Mono',monospace;color:#666">vs ${fmt(Math.round(overloadTrend.prevVolume))} kg (prev 4 weeks)</div>
+      </div>
+      <div style="border:2px solid var(--ink);padding:14px;text-align:center;background:${overloadTrend.sets>overloadTrend.prevSets?'var(--mint)':'var(--paper)'}">
+        <div style="font:9px 'DM Mono',monospace">Avg Weekly Sets</div>
+        <div style="font-size:20px;font-weight:800">${Math.round(overloadTrend.sets)}</div>
+        <div style="font:9px 'DM Mono',monospace;color:#666">vs ${Math.round(overloadTrend.prevSets)} (prev 4 weeks)</div>
+      </div>
+      <div style="border:2px solid var(--ink);padding:14px;text-align:center;background:${overloadTrend.sessions>overloadTrend.prevSessions?'var(--mint)':'var(--paper)'}">
+        <div style="font:9px 'DM Mono',monospace">Avg Weekly Sessions</div>
+        <div style="font-size:20px;font-weight:800">${overloadTrend.sessions.toFixed(1)}</div>
+        <div style="font:9px 'DM Mono',monospace;color:#666">vs ${overloadTrend.prevSessions.toFixed(1)} (prev 4 weeks)</div>
+      </div>
+    </div>`:''}
+    
+    <h2>Volume Over Time</h2>
     <div class="bar-chart" style="height:${chartHeight}px">${weekly.slice(-12).map(w=>{const pct=w.volume/maxVol;const height=Math.max(4,pct*chartHeight);return `<div class="bar-chart-col" title="Week of ${w.weekStart}: ${fmt(w.volume)} kg"><div class="bar-chart-bar" style="height:${height}px"></div><span class="bar-chart-label">${w.weekStart.slice(5)}</span></div>`;}).join('')}</div>
-    <h2 style="margin-top:30px">Weekly Sessions</h2>
-    <div class="bar-chart" style="height:${chartHeight}px">${weekly.slice(-12).map(w=>{const pct=w.count/Math.max(...weekly.map(x=>x.count));const height=Math.max(4,pct*chartHeight);return `<div class="bar-chart-col" title="Week of ${w.weekStart}: ${w.count} sessions"><div class="bar-chart-bar" style="height:${height}px;background:var(--lilac)"></div><span class="bar-chart-label">${w.weekStart.slice(5)}</span></div>`;}).join('')}</div>
-    <h2 style="margin-top:30px">Volume by Muscle Group</h2><div class="muscle-pie" id="muscle-pie"></div>${renderMusclePie()}</div>`;
-}
-
-function renderMusclePie(){
-  const muscleStats=GymAnalytics.getMuscleGroupStats(state.logs);
-  const totalVolume=Object.values(muscleStats).reduce((a,b)=>a+b,0);
-  if(!totalVolume)return '';
-  const colors=['#fd6b43','#f8dc65','#bcebcf','#ddd7ff','#ffb3b3','#b3d9ff','#d4edda','#ffeeba','#c3e6cb','#f5c6cb'];
-  const entries=Object.entries(muscleStats).sort((a,b)=>b[1]-a[1]);
-  return `<div class="pie-chart">${entries.slice(0,8).map(([muscle,vol],i)=>{const pct=((vol/totalVolume)*100).toFixed(1);return `<div class="pie-row"><span class="pie-dot" style="background:${colors[i%colors.length]}"></span><span class="pie-label">${muscle}</span><span class="pie-bar"><div class="pie-bar-fill" style="width:${pct}%;background:${colors[i%colors.length]}"></div></span><span class="pie-pct">${pct}%</span></div>`;}).join('')}</div>`;
+    
+    <h2 style="margin-top:30px">Working Sets Per Week</h2>
+    <div class="bar-chart" style="height:${chartHeight}px">${weekly.slice(-12).map(w=>{const pct=w.sets/maxSets;const height=Math.max(4,pct*chartHeight);return `<div class="bar-chart-col" title="Week of ${w.weekStart}: ${w.sets} sets"><div class="bar-chart-bar" style="height:${height}px;background:var(--lilac)"></div><span class="bar-chart-label">${w.weekStart.slice(5)}</span></div>`;}).join('')}</div>
+    
+    <h2 style="margin-top:30px">Sessions Per Week</h2>
+    <div class="bar-chart" style="height:${chartHeight}px">${weekly.slice(-12).map(w=>{const pct=w.count/maxSessions;const height=Math.max(4,pct*chartHeight);return `<div class="bar-chart-col" title="Week of ${w.weekStart}: ${w.count} sessions"><div class="bar-chart-bar" style="height:${height}px;background:var(--mint)"></div><span class="bar-chart-label">${w.weekStart.slice(5)}</span></div>`;}).join('')}</div>
+    
+    <h2 style="margin-top:30px">Exercise Variety Per Week</h2>
+    <div class="bar-chart" style="height:${chartHeight}px">${weekly.slice(-12).map(w=>{const pct=w.exercises.length/Math.max(...weekly.map(x=>x.exercises.length));const height=Math.max(4,pct*chartHeight);return `<div class="bar-chart-col" title="Week of ${w.weekStart}: ${w.exercises.length} exercises"><div class="bar-chart-bar" style="height:${height}px;background:var(--sun)"></div><span class="bar-chart-label">${w.weekStart.slice(5)}</span></div>`;}).join('')}</div>
+  </div>`;
 }
 
 function social(){
