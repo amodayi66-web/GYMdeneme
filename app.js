@@ -76,12 +76,30 @@ function getProgramProgress(){
   const weeksMatch=plan.duration.match(/(\d+)\s*weeks?/i);
   if(!weeksMatch)return null;
   const totalWeeks=parseInt(weeksMatch[1]);
-  // Count completed workouts that belong to this program
+  // Count completed workouts that belong to this program.
+  // First, match by direct ID (log.workout === workout.id)
   const completedIds=new Set(state.logs.map(l=>l.workout));
-  const completedWorkouts=sourceWorkouts.filter(w=>completedIds.has(w.id));
+  let completedSessions=sourceWorkouts.filter(w=>completedIds.has(w.id)).length;
+  // Second, also count orphaned logs: logs whose workout ID doesn't match
+  // any existing workout, but whose exercises overlap with a plan day.
+  // This handles the case where workouts were regenerated with new IDs.
+  const existingIds=new Set(state.workouts.map(w=>w.id));
+  state.logs.forEach(l=>{
+    if(!existingIds.has(l.workout)){
+      // Orphaned log — check if it matches a plan day
+      const logExIds=new Set(Object.keys(l.sets||{}));
+      plan.days.forEach(d=>{
+        const planExIds=new Set(d[1].map(ex=>byName(Array.isArray(ex)?ex[0]:ex)));
+        let matches=0;
+        logExIds.forEach(le=>{if(planExIds.has(le))matches++;});
+        if(matches>=2){
+          completedSessions++;
+        }
+      });
+    }
+  });
   // Each week has plan.sessionsPerWeek workouts (or days.length*2)
   const sessionsPerWeek=plan.sessionsPerWeek||Math.min(plan.days.length*2,6);
-  const completedSessions=completedWorkouts.length;
   const currentWeek=Math.min(Math.floor(completedSessions/sessionsPerWeek)+1,totalWeeks);
   return {currentWeek,totalWeeks,completedSessions,totalSessions:totalWeeks*sessionsPerWeek,sessionsPerWeek};
 }
