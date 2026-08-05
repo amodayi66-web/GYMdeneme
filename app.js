@@ -268,13 +268,28 @@ let workoutTimer=null;
 let restTimer=null;
 let restDuration=90;
 
-function setRowHtml(n, prevReps='', prevWeight='', isWarmup=false){
+// ── Session state persistence (live input data) ──
+function getSessionKey(id){return `gym-session-${id}`;}
+function loadSession(id){
+  try{const d=JSON.parse(localStorage.getItem(getSessionKey(id)));return d||{};}catch(e){return {};}
+}
+function saveSession(id,data){
+  localStorage.setItem(getSessionKey(id),JSON.stringify(data));
+  // Also save to state as backup for sync
+  if(!state.__sessionData)state.__sessionData={};
+  state.__sessionData[id]=data;
+  save(false);
+}
+
+function setRowHtml(n, prevReps='', prevWeight='', isWarmup=false, prevRir=''){
   const prevStr=prevReps?`<small class="prev-data">${prevReps}×${prevWeight}</small>`:'';
   return `<div class="set-row ${isWarmup?'warmup':''}" data-set="${n}">
     <span>${String(n).padStart(2,'0')}</span>
     <input class="reps" placeholder="0" inputmode="numeric" value="${prevReps}">
     <input class="weight" placeholder="opt" inputmode="decimal" value="${prevWeight}">
-    <span>kg</span>${prevStr}
+    <span>kg</span>
+    <input class="rir" placeholder="RIR" inputmode="numeric" style="width:40px;border:2px solid var(--ink);padding:6px;background:var(--paper);outline:0" value="${prevRir}">
+    ${prevStr}
   </div>`;
 }
 
@@ -364,8 +379,8 @@ function log(id){
       <small>${e.muscles.join(' · ')}</small>
       ${pres?`<div class="prescription">${esc(pres)}</div>`:''}
       ${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}
-      <div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span></div>
-      <div class="sets">${setRowHtml(1)}${setRowHtml(2)}${setRowHtml(3)}</div>
+      <div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span><span>RIR</span></div>
+      <div class="sets">${loadSession(wid)[exId]?loadSession(wid)[exId].map((s,i)=>setRowHtml(i+1,s.reps||'',s.weight||'',false,s.rir||'')).join(''):setRowHtml(1)+setRowHtml(2)+setRowHtml(3)}</div>
       <button class="add-set">+ add set</button>
       <div class="superset-group" style="display:none;margin-top:8px;padding:8px;background:var(--mint);border:1px solid var(--ink)"></div>
     </article>`;
@@ -388,19 +403,27 @@ function log(id){
   </div>`;
 }
 
-function readLog(){
+function readLog(wid){
   let r={};
+  let sessionData={};
   document.querySelectorAll('.log-card').forEach(c=>{
     const exId=c.dataset.exercise;
     const sets=[...c.querySelectorAll('.set-row:not(.warmup)')].map(x=>({
       reps:+x.querySelector('.reps').value||0,
-      weight:+x.querySelector('.weight').value||0
+      weight:+x.querySelector('.weight').value||0,
+      rir:x.querySelector('.rir')?+x.querySelector('.rir').value||0:0
     })).filter(x=>x.reps);
     const warmup=[...c.querySelectorAll('.set-row.warmup')].map(x=>({
-      reps:+x.querySelector('.reps').value||0, weight:+x.querySelector('.weight').value||0, warmup:true
+      reps:+x.querySelector('.reps').value||0, weight:+x.querySelector('.weight').value||0, warmup:true,
+      rir:x.querySelector('.rir')?+x.querySelector('.rir').value||0:0
     })).filter(x=>x.reps);
     r[exId]=[...warmup,...sets];
+    // Build session data for persistence
+    sessionData[exId]=sets.map(s=>({reps:s.reps,weight:s.weight,rir:s.rir}));
   });
+  // Save session data immediately
+  const wid=location.hash.split('/')[2];
+  if(wid)saveSession(wid,sessionData);
   return r;
 }
 
@@ -1122,6 +1145,10 @@ function initLog(){
     const duration=workoutTimer?workoutTimer.stop():0; const durationStr=GymTimers.formatDuration(duration);
     let l={id:uid(), workout:finish.dataset.finish, date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}), duration:durationStr, sets};
     state.logs.push(l); save();
+    // Clear session data for this workout
+    const wid=finish.dataset.finish;
+    localStorage.removeItem(getSessionKey(wid));
+    if(state.__sessionData)delete state.__sessionData[wid];
     if(GymSync.isConfigured()&&GymSync.isSignedIn()){try{GymSync.pushState(state)}catch(e){console.error('Sync error:',e)}}
     location.hash=`#/summary/${l.id}`;
   };
