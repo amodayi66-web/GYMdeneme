@@ -403,9 +403,10 @@ function log(id){
   </div>`;
 }
 
-function readLog(wid){
+function readLog(){
   let r={};
   let sessionData={};
+  const sessionWid=location.hash.split('/')[2];
   document.querySelectorAll('.log-card').forEach(c=>{
     const exId=c.dataset.exercise;
     const sets=[...c.querySelectorAll('.set-row:not(.warmup)')].map(x=>({
@@ -422,8 +423,7 @@ function readLog(wid){
     sessionData[exId]=sets.map(s=>({reps:s.reps,weight:s.weight,rir:s.rir}));
   });
   // Save session data immediately
-  const wid=location.hash.split('/')[2];
-  if(wid)saveSession(wid,sessionData);
+  if(sessionWid)saveSession(sessionWid,sessionData);
   return r;
 }
 
