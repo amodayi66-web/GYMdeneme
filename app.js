@@ -314,15 +314,15 @@ function saveSession(id,data){
   save(false);
 }
 
-function setRowHtml(n, prevReps='', prevWeight='', isWarmup=false, prevRir=''){
-  const prevStr=prevReps?`<small class="prev-data">${prevReps}×${prevWeight}</small>`:'';
+function setRowHtml(n, prevReps='', prevWeight='', isWarmup=false, prevRir='', lastReps='', lastWeight=''){
+  const lastStr=lastReps?`<span class="last-data">${lastReps}×${lastWeight}</span>`:'';
   return `<div class="set-row ${isWarmup?'warmup':''}" data-set="${n}">
     <span>${String(n).padStart(2,'0')}</span>
     <input class="reps" placeholder="0" inputmode="numeric" value="${prevReps}">
     <input class="weight" placeholder="opt" inputmode="decimal" value="${prevWeight}">
+    <input class="rir" placeholder="RIR" inputmode="numeric" style="width:36px;border:2px solid var(--ink);padding:6px;background:var(--paper);outline:0" value="${prevRir}">
     <span>kg</span>
-    <input class="rir" placeholder="RIR" inputmode="numeric" style="width:40px;border:2px solid var(--ink);padding:6px;background:var(--paper);outline:0" value="${prevRir}">
-    ${prevStr}
+    ${lastStr}
   </div>`;
 }
 
@@ -383,11 +383,14 @@ function log(id){
     const pres=getExPrescription(x);
     const prev=GymAnalytics.getPreviousExerciseData(state.logs,exId);
     const prevHtml=prev?`<div class="prev-best ${prev?'pr':''}">Best: ${prev.reps} reps × ${prev.weight} kg (${prev.date})</div>`:'';
-    const prevSets=getPreviousSets(exId);
-    const prevSetsHtml=prevSets?`<div class="prev-sets-heading">LAST SESSION (${prevSets.date})</div><div class="prev-sets-grid">${prevSets.sets.map((s,i)=>`<span class="prev-set">Set ${i+1}: ${s.reps}×${s.weight} kg${s.rir!==undefined&&s.rir!==null&&s.rir!==0?' · RIR '+s.rir:''}${s.rpe?' @'+s.rpe:''}</span>`).join('')}</div>`:'';
+    // Get last session sets for the "Last" column (use last exercise data)
+    const lastSessionSets=getPreviousSets(exId);
+    const lastSets=lastSessionSets?lastSessionSets.sets:[];
     const note=getExerciseNote(exId);
     const noteHtml=note?`<div class="exercise-note">📝 ${esc(note)}</div>`:'';
     const warmupSets=`<div class="warmup-section"><button class="toggle-warmup" data-exercise="${exId}">+ Warm-up sets</button><div class="warmup-sets" id="warmup-${exId}" style="display:none"></div></div>`;
+    // Build last-session data per set index
+    const getLastSet=(idx)=>lastSets[idx]?{reps:lastSets[idx].reps,weight:lastSets[idx].weight,rir:lastSets[idx].rir}:null;
     return `<article class="log-card" data-exercise="${exId}" data-ex-index="${exIndex}">
       <div class="log-card-header">
         <span class="reorder-handle" style="display:none;cursor:grab;font-size:12px;margin-right:4px">⠿</span>
@@ -411,9 +414,15 @@ function log(id){
       </div>
       <small>${e.muscles.join(' · ')}</small>
       ${pres?`<div class="prescription">${esc(pres)}</div>`:''}
-      ${noteHtml}${prevHtml}${prevSetsHtml}${warmupSets}
-      <div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>kg</span><span>RIR</span></div>
-      <div class="sets">${loadSession(wid)[exId]?loadSession(wid)[exId].map((s,i)=>setRowHtml(i+1,s.reps||'',s.weight||'',false,s.rir||'')).join(''):setRowHtml(1)+setRowHtml(2)+setRowHtml(3)}</div>
+      ${noteHtml}${prevHtml}${warmupSets}
+      <div class="set-labels"><span>Set</span><span>Reps</span><span>Weight</span><span>RIR</span><span>kg</span><span class="last-label">Last</span></div>
+      <div class="sets">${loadSession(wid)[exId]?loadSession(wid)[exId].map((s,i)=>{
+        const last=getLastSet(i);
+        return setRowHtml(i+1,s.reps||'',s.weight||'',false,s.rir||'',last?last.reps:'',last?last.weight:'');
+      }).join(''):Array.from({length:3},(_,i)=>{
+        const last=getLastSet(i);
+        return setRowHtml(i+1,'','',false,'',last?last.reps:'',last?last.weight:'');
+      }).join('')}</div>
       <button class="add-set">+ add set</button>
       <div class="superset-group" style="display:none;margin-top:8px;padding:8px;background:var(--mint);border:1px solid var(--ink)"></div>
     </article>`;
