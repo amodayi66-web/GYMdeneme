@@ -162,11 +162,44 @@ function home(){
   return `<section class="hero">${head('A plan that fits you.','Choose a guided plan for your level or build a simple workout from the gym movements you enjoy.')}</section>
   ${nextW?`<div style="border:var(--line);background:var(--sun);padding:18px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
     <div><div class="eyebrow">NEXT WORKOUT</div><h2 style="font-size:22px;letter-spacing:-1px;margin:4px 0 0">${esc(nextW.name)}</h2></div>
-    <a class="button" href="#/log/${nextW.id}">Start next workout →</a>
+    <a class="button" href="#/log/${nextW.id}">Start workout →</a>
   </div>`:''}
   ${progBar?`<div style="margin-bottom:24px">${progBar}</div>`:''}
   <section><div class="section-head"><div><div class="eyebrow">YOUR WORKOUTS</div><h2>My plan</h2></div><a class="button mint" href="#/templates">Choose a plan →</a></div>
-  ${state.workouts.length?`<div class="workout-grid">${state.workouts.map((w,i)=>`<a href="#/workout/${w.id}" class="workout-card"><small>${String(i+1).padStart(2,'0')} / ${w.exercises.length} exercises</small><h2>${esc(w.name)}</h2><p>${w.exercises.slice(0,3).map(x=>{const e=findExercise(getExId(x));return e?e.name:'?'}).join(' · ')}${w.exercises.length>3?' · …':''}</p><div class="card-foot"><span>OPEN WORKOUT</span><span>↗</span></div></a>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
+  ${state.workouts.length?`<div class="plan-list-rows">${state.workouts.map((w,i)=>`
+    <div class="plan-row">
+      <div class="plan-row-info">
+        <b>${esc(w.name)}</b>
+        <span class="plan-row-sub">${String(i+1).padStart(2,'0')} · ${w.exercises.length} exercises</span>
+      </div>
+      <div class="plan-row-actions">
+        <a class="button small white" href="#/details/${w.id}">Details</a>
+        <a class="button small" href="#/log/${w.id}">Start</a>
+      </div>
+    </div>`).join('')}</div>`:`<div class="empty"><h2>Start with a plan, not a blank page.</h2><p>Pick a clear structure for your current experience level, or make your own workout in a few clicks.</p><a class="button white" href="#/templates">Browse pre-made plans →</a> <a class="button mint" href="#/builder">Build my own</a></div>`}</section>`;
+}
+
+// ── Details page: brief plan summary + start/edit actions ──
+function details(id){
+  const w=state.workouts.find(x=>x.id===id);
+  if(!w)return home();
+  const exerciseNames = w.exercises.map(x=>{
+    const e=findExercise(getExId(x));
+    const pres=getExPrescription(x);
+    return e?`<li class="details-ex-row"><span><b>${e.name}</b></span><span class="details-ex-pres">${pres?esc(pres):''}</span></li>`:'';
+  }).join('');
+  return `<a class="back" href="#/">← My plan</a>
+  <div class="builder-head"><div>${head(esc(w.name),`${w.exercises.length} exercises. Keep the session simple and focused.`)}</div></div>
+  <div class="details-summary">
+    <div class="eyebrow">PLAN SNAPSHOT</div>
+    <h3 style="font-size:18px;margin:6px 0 10px">Quick overview</h3>
+    <ul class="details-ex-list">${exerciseNames||'<li>No exercises yet.</li>'}</ul>
+  </div>
+  <div style="display:flex;gap:12px;margin-top:24px;flex-wrap:wrap">
+    <a class="button" href="#/log/${w.id}">Start workout →</a>
+    <a class="button white" href="#/edit/${w.id}">✎ Edit workout</a>
+    <button class="button white" data-delete="${w.id}">Delete workout</button>
+  </div>`;
 }
 
 let level='All';
@@ -351,7 +384,7 @@ function log(id){
     const prev=GymAnalytics.getPreviousExerciseData(state.logs,exId);
     const prevHtml=prev?`<div class="prev-best ${prev?'pr':''}">Best: ${prev.reps} reps × ${prev.weight} kg (${prev.date})</div>`:'';
     const prevSets=getPreviousSets(exId);
-    const prevSetsHtml=prevSets?`<div class="prev-sets-heading">LAST SESSION (${prevSets.date})</div><div class="prev-sets-grid">${prevSets.sets.map((s,i)=>`<span class="prev-set">Set ${i+1}: ${s.reps}×${s.weight} kg${s.rpe?' @'+s.rpe:''}</span>`).join('')}</div>`:'';
+    const prevSetsHtml=prevSets?`<div class="prev-sets-heading">LAST SESSION (${prevSets.date})</div><div class="prev-sets-grid">${prevSets.sets.map((s,i)=>`<span class="prev-set">Set ${i+1}: ${s.reps}×${s.weight} kg${s.rir!==undefined&&s.rir!==null&&s.rir!==0?' · RIR '+s.rir:''}${s.rpe?' @'+s.rpe:''}</span>`).join('')}</div>`:'';
     const note=getExerciseNote(exId);
     const noteHtml=note?`<div class="exercise-note">📝 ${esc(note)}</div>`:'';
     const warmupSets=`<div class="warmup-section"><button class="toggle-warmup" data-exercise="${exId}">+ Warm-up sets</button><div class="warmup-sets" id="warmup-${exId}" style="display:none"></div></div>`;
@@ -445,9 +478,11 @@ function markCompletedInput(inp){
   if(inp.value&&parseFloat(inp.value)>0){
     inp.style.background='var(--mint)';
     inp.style.borderColor='var(--ink)';
+    inp.classList.add('is-filled');
   } else {
     inp.style.background='';
     inp.style.borderColor='';
+    inp.classList.remove('is-filled');
   }
 }
 
@@ -808,6 +843,7 @@ function render(){
     case 'builder': $('#app').innerHTML=builder(); renderBuilder(); break;
     case 'workout': $('#app').innerHTML=workout(p[1]); break;
     case 'edit': $('#app').innerHTML=editWorkout(p[1]); setTimeout(initEditWorkout,50); break;
+    case 'details': $('#app').innerHTML=details(p[1]); break;
     case 'log': $('#app').innerHTML=log(p[1]); setTimeout(initLog,50); break;
     case 'summary': $('#app').innerHTML=summary(p[1]); break;
     case 'progress': $('#app').innerHTML=progress(); setTimeout(initProgress,50); break;

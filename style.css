@@ -130,6 +130,28 @@
 .reorder-controls button:hover{background:var(--sun)}
 .reorder-controls button:disabled{opacity:0.3;cursor:default}
 
+/* ── List-based plan rows (main page redesign) ── */
+.plan-list-rows{border:var(--line);background:#fff}
+.plan-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:2px solid var(--ink)}
+.plan-row:last-child{border-bottom:0}
+.plan-row:nth-child(odd){background:#fff7df}
+.plan-row-info{display:flex;flex-direction:column;gap:3px;min-width:0}
+.plan-row-info b{font-size:15px;letter-spacing:-0.3px}
+.plan-row-sub{font:9px 'DM Mono',monospace;color:#666}
+.plan-row-actions{display:flex;gap:8px;flex-shrink:0}
+.plan-row-actions .button{padding:8px 12px;font-size:11px}
+
+/* ── Details page ── */
+.details-summary{border:var(--line);background:#fff;padding:20px}
+.details-ex-list{list-style:none;padding:0;margin:0}
+.details-ex-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:10px 0;border-top:2px solid var(--ink);font-size:13px}
+.details-ex-row:first-child{border-top:0}
+.details-ex-pres{font:9px 'DM Mono',monospace;color:#666;text-align:right}
+
+/* ── Green completion styling for filled set inputs ── */
+.set-row input.is-filled{background:var(--mint)!important;border-color:var(--ink)!important}
+.set-row input.is-filled:focus{background:#fff6ca!important}
+
 /* Responsive */
 @media(max-width:800px){.topbar{display:none}body{padding-top:0}main{padding:40px 18px 92px}.hero h1,.template-intro h1,.builder-head h1,.session-head h1{font-size:44px}.workout-grid,.template-grid,.exercise-list,.log-layout,.builder,.progress-grid,.report-stats,.measure-form,.measure-grid,.daily-breakdown{grid-template-columns:1fr}.section-head,.builder-head,.session-head,.report-header{display:block}.section-head .button,.session-head .button{margin-top:16px}.selection,.totals{position:static;order:-1}.template-card h2{font-size:25px}.mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:66px;z-index:20;background:var(--ink);align-items:center;justify-content:space-around}.mobile-nav a{color:white;font:10px 'DM Mono',monospace}.summary-stats{grid-template-columns:1fr}.progress-card .stat{flex-wrap:wrap}}
 

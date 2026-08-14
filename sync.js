@@ -47,8 +47,14 @@ const GymSync = (() => {
   async function ensureSignedIn() {
     if (!configured) return null;
     if (auth.currentUser) return auth.currentUser;
-    const cred = await auth.signInAnonymously();
-    return cred.user;
+    try {
+      const cred = await auth.signInAnonymously();
+      return cred.user;
+    } catch (e) {
+      console.error('Auth sign-in failed:', e);
+      lastSyncResult = { ok: false, time: Date.now(), error: e.message };
+      throw e;
+    }
   }
 
   // ── Claim a username. Data is stored by USERNAME, not by UID. ──

@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── USERNAME DIRECTORIES (shared data path) ──
+    // Anyone authenticated can read/write username state so cross-device
+    // sync works with the same username.
+    match /usernames/{username} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+      match /data/{docId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
+      }
+    }
+
+    // ── USER DATA (per-UID path) ──
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+      match /{document=**} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
+      }
+    }
+  }
+}
