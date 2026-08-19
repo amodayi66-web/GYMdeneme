@@ -5,6 +5,7 @@
 // ============================================================================
 const GymSync = (() => {
   const cfg = window.FIREBASE_CONFIG || {};
+  const _uid = () => `${Date.now()}${Math.random().toString(16).slice(2)}`;
   const configured = cfg.apiKey && cfg.apiKey !== 'YOUR_API_KEY' && typeof firebase !== 'undefined';
   let db = null, auth = null, user = null, profile = null;
   let stateUnsub = null;
@@ -59,11 +60,23 @@ const GymSync = (() => {
 
   // ── Claim a username. Data is stored by USERNAME, not by UID. ──
   // This means every device using the same username reads/writes the same data.
+  // Gracefully handles Firestore failures: login still works, sync is best-effort.
   async function claimUsername(username) {
     if (!configured) throw new Error('Sync is not configured yet.');
     const clean = username.trim();
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(clean)) throw new Error('Usernames are 3–20 letters, numbers, or _.');
-    const authedUser = await ensureSignedIn();
+    let authedUser = null;
+    try {
+      authedUser = await ensureSignedIn();
+    } catch (e) {
+      // Auth failed — still allow local login
+      console.error('Auth failed:', e);
+      user = null;
+      profile = { username: clean, uid: 'local-' + _uid() };
+      fireAuth();
+      return { profile, cloudData: null };
+    }
+    
     const key = clean.toLowerCase();
     const nameRef = db.collection('usernames').doc(key);
     
@@ -73,67 +86,48 @@ const GymSync = (() => {
     try {
       existingDoc = await nameRef.get();
     } catch (e) {
-      // If this fails (e.g. security rules), we still try to proceed
+      // Firestore unavailable — proceed with local-only mode
+      console.warn('Firestore unavailable, proceeding locally:', e.message);
+      lastSyncResult = { ok: false, time: Date.now(), error: 'Cloud sync unavailable — working offline' };
     }
     
+    // Try to read any existing cloud data (best-effort)
     if (existingDoc && existingDoc.exists) {
-      // Username exists — try to read data from the USERNAME-BASED path first
       try {
         const stateDoc = await getUsernameDataRef(key).get();
-        cloudData = extractData(stateDoc);
-      } catch (e) {
-        console.error('Failed to read username-based data:', e);
-      }
-      
-      // If no data at username path, try the old UID-based path (migration)
+        if (stateDoc.exists) cloudData = extractData(stateDoc);
+      } catch (e) {}
       if (!cloudData) {
         const oldUid = existingDoc.data().uid;
         if (oldUid) {
           try {
             const oldDoc = await db.collection('users').doc(oldUid).collection('state').doc('data').get();
-            cloudData = extractData(oldDoc);
-            // Migrate to username-based path
-            if (cloudData) {
-              await getUsernameDataRef(key).set(cloudData);
-            }
-          } catch (e) {
-            console.error('Failed to migrate old data:', e);
-          }
-        }
-      }
-      
-      // Also scan all linked UIDs for data
-      const uids = existingDoc.data().uids || [existingDoc.data().uid].filter(Boolean);
-      if (!cloudData) {
-        for (const uid of uids) {
-          try {
-            const doc = await db.collection('users').doc(uid).collection('state').doc('data').get();
-            const data = extractData(doc);
-            if (data && (data.workouts.length || data.logs.length)) {
-              cloudData = data;
-              // Migrate to username path
-              await getUsernameDataRef(key).set(data);
-              break;
-            }
+            if (oldDoc.exists) cloudData = extractData(oldDoc);
           } catch (e) {}
         }
       }
-      
-      // Update the username doc: add our UID to the list
-      await nameRef.set({
-        uid: existingDoc.data().uid || authedUser.uid,
-        uids: firebase.firestore.FieldValue.arrayUnion(authedUser.uid),
-        username: clean,
-        lastAccessed: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-    } else {
-      // Username is free — claim it
-      await nameRef.set({
-        uid: authedUser.uid,
-        uids: [authedUser.uid],
-        username: clean,
-        lastAccessed: firebase.firestore.FieldValue.serverTimestamp()
-      });
+    }
+    
+    // Try to write to Firestore (best-effort, don't fail login if it doesn't work)
+    try {
+      if (existingDoc && existingDoc.exists) {
+        await nameRef.set({
+          uid: existingDoc.data().uid || authedUser.uid,
+          uids: firebase.firestore.FieldValue.arrayUnion(authedUser.uid),
+          username: clean,
+          lastAccessed: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      } else {
+        await nameRef.set({
+          uid: authedUser.uid,
+          uids: [authedUser.uid],
+          username: clean,
+          lastAccessed: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+    } catch (e) {
+      console.warn('Firestore write failed, continuing offline:', e.message);
+      lastSyncResult = { ok: false, time: Date.now(), error: 'Cloud sync unavailable — working offline' };
     }
     
     user = authedUser;
