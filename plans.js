@@ -151,36 +151,36 @@ const PLANS = [
     days:[
       ['Upper Power',[
         ['Barbell Bench Press','3-4×3-5 @9'],
-        ['Dumbbell Incline Press','3-4×6-10 @9'],
-        ['Barbell Row','3-4×3-5 @9'],
-        ['Cable Lat Pulldown','3-4×6-10 @9'],
-        ['Overhead Press (Strict)','2-3×5-8 @9'],
+        ['Incline Dumbbell Bench Press','3-4×6-10 @9'],
+        ['Bent Over Row','3-4×3-5 @9'],
+        ['Lat Pull Down','3-4×6-10 @9'],
+        ['Overhead Press','2-3×5-8 @9'],
         ['Barbell Curl','2-3×6-10 @9'],
-        ['EZ Bar Skull Crusher','2-3×6-10 @9']
+        ['Skullcrusher','2-3×6-10 @9']
       ]],
       ['Lower Power',[
-        ['Barbell Back Squat','3-4×3-5 @9'],
-        ['Barbell Deadlift (Conventional)','3-4×3-5 @9'],
-        ['Machine Leg Press','3-5×10-15 @9'],
-        ['Machine Leg Curl','3-4×6-10 @9'],
+        ['Squat','3-4×3-5 @9'],
+        ['Deadlift','3-4×3-5 @9'],
+        ['Leg Press','3-5×10-15 @9'],
+        ['Leg Curl','3-4×6-10 @9'],
         ['Calf Raise Machine (Standing)','4×6-10 @9']
       ]],
       ['Upper Hypertrophy',[
-        ['Barbell Incline Bench Press','3-4×8-12 @9'],
-        ['Dumbbell Chest Fly','3-4×8-12 @9'],
-        ['Cable Seated Row','3-4×8-12 @9'],
-        ['Dumbbell Row','3-4×8-12 @9'],
+        ['Incline Barbell Bench Press','3-4×8-12 @9'],
+        ['Flat Bench Dumbbell Flye','3-4×8-12 @9'],
+        ['Seated Cable Row','3-4×8-12 @9'],
+        ['One Arm Dumbbell Row','3-4×8-12 @9'],
         ['Dumbbell Lateral Raise','3-4×8-12 @9'],
-        ['Dumbbell Curl','3-4×8-12 @9'],
-        ['Cable Overhead Triceps Extension','3-4×8-12 @9']
+        ['Seated Incline Dumbbell Curl','3-4×8-12 @9'],
+        ['Cable Tricep Extension','3-4×8-12 @9']
       ]],
       ['Lower Hypertrophy',[
-        ['Barbell Front Squat','3-4×8-12 @9'],
-        ['Barbell Lunges','3-4×8-12 @9'],
-        ['Machine Leg Extension','3-4×10-15 @9'],
-        ['Machine Leg Curl','3-4×10-15 @9'],
-        ['Calf Raise Machine (Seated)','3-4×8-12 @9'],
-        ['Machine Calf Raise','3-4×8-12 @9']
+        ['Front Squat','3-4×8-12 @9'],
+        ['Barbell Lunge','3-4×8-12 @9'],
+        ['Leg Extension','3-4×10-15 @9'],
+        ['Leg Curl','3-4×10-15 @9'],
+        ['Seated Calf Raise','3-4×8-12 @9'],
+        ['Calf Press','3-4×8-12 @9']
       ]]
     ]
   },
