@@ -145,13 +145,43 @@ const PLANS = [
     name:'PHUL (Power Hypertrophy)',
     level:'Intermediate',
     goal:'Strength',
-    duration:'60 min · 8 weeks',
-    desc:'Power Hypertrophy Upper Lower. Combines strength and size training in one 4-day program.',
+    duration:'60 min · 12 weeks',
+    sessionsPerWeek:4,
+    desc:'Brandon Campbell\'s classic Power Hypertrophy Upper Lower 4-day split. Power days build strength in the big lifts (3-5 reps), hypertrophy days add volume for size (8-15 reps). Schedule: Mon Upper Power, Tue Lower Power, Rest, Thu Upper Hypertrophy, Fri Lower Hypertrophy. All working sets at RPE 9 — finish with 1 rep left in the tank. Add weight or reps every session.',
     days:[
-      ['Upper Power',['Barbell Bench Press','Barbell Row','Overhead Press (Strict)','Barbell Curl','Cable Triceps Pushdown']],
-      ['Lower Power',['Barbell Back Squat','Barbell Deadlift (Conventional)','Machine Leg Press','Calf Raise Machine (Standing)']],
-      ['Upper Hypertrophy',['Dumbbell Incline Press','Cable Seated Row','Dumbbell Lateral Raise','Dumbbell Curl','Cable Overhead Triceps Extension']],
-      ['Lower Hypertrophy',['Barbell Front Squat','Romanian Deadlift','Machine Leg Extension','Machine Leg Curl','Calf Raise Machine (Seated)']]
+      ['Upper Power',[
+        ['Barbell Bench Press','3-4×3-5 @9'],
+        ['Dumbbell Incline Press','3-4×6-10 @9'],
+        ['Barbell Row','3-4×3-5 @9'],
+        ['Cable Lat Pulldown','3-4×6-10 @9'],
+        ['Overhead Press (Strict)','2-3×5-8 @9'],
+        ['Barbell Curl','2-3×6-10 @9'],
+        ['EZ Bar Skull Crusher','2-3×6-10 @9']
+      ]],
+      ['Lower Power',[
+        ['Barbell Back Squat','3-4×3-5 @9'],
+        ['Barbell Deadlift (Conventional)','3-4×3-5 @9'],
+        ['Machine Leg Press','3-5×10-15 @9'],
+        ['Machine Leg Curl','3-4×6-10 @9'],
+        ['Calf Raise Machine (Standing)','4×6-10 @9']
+      ]],
+      ['Upper Hypertrophy',[
+        ['Barbell Incline Bench Press','3-4×8-12 @9'],
+        ['Dumbbell Chest Fly','3-4×8-12 @9'],
+        ['Cable Seated Row','3-4×8-12 @9'],
+        ['Dumbbell Row','3-4×8-12 @9'],
+        ['Dumbbell Lateral Raise','3-4×8-12 @9'],
+        ['Dumbbell Curl','3-4×8-12 @9'],
+        ['Cable Overhead Triceps Extension','3-4×8-12 @9']
+      ]],
+      ['Lower Hypertrophy',[
+        ['Barbell Front Squat','3-4×8-12 @9'],
+        ['Barbell Lunges','3-4×8-12 @9'],
+        ['Machine Leg Extension','3-4×10-15 @9'],
+        ['Machine Leg Curl','3-4×10-15 @9'],
+        ['Calf Raise Machine (Seated)','3-4×8-12 @9'],
+        ['Machine Calf Raise','3-4×8-12 @9']
+      ]]
     ]
   },
   {
