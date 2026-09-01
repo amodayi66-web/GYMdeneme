@@ -118,7 +118,21 @@ const GymTimers = (() => {
     let restStartTime = null;
     let countdownStartTime = null;
 
-    function setDuration(sec) { duration = sec; }
+    function setDuration(sec) {
+      if (isRunning) {
+        // Timer is running: adjust remaining proportionally.
+        // e.g. 120s → 100s remaining, change to 60s → 50s remaining.
+        const elapsed = Math.min(duration, (Date.now() - restStartTime) / 1000);
+        const pctDone = duration > 0 ? elapsed / duration : 0;
+        duration = sec;
+        remaining = Math.max(0, sec * (1 - pctDone));
+        // Adjust restStartTime so the interval recalc matches new remaining
+        restStartTime = Date.now() - (duration - remaining) * 1000;
+      } else {
+        duration = sec;
+        if (!isCountdown) remaining = sec;
+      }
+    }
     function getDuration() { return duration; }
 
     function start() {

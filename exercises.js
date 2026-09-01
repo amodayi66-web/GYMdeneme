@@ -167,11 +167,57 @@ const _EX_RAW = [
   ['Calf Press','Machine','Legs'],
 ];
 
+// ── OPEX Fitness YouTube exercise videos ──
+// Map exercise names to OPEX YouTube video IDs for technique demonstrations
+const exerciseVideoIds = {
+  // OPEX exercise technique videos
+  'Paused Goblet Squat': 'BwgftZE4w0U',
+  'Paused Air Squat': 'lnMehhkv56Y',
+  'Knee Banded Air Squat': 'bN0UaZT9zIE',
+  'Adduction Leg Raise': 'y20SM4UijCo',
+  'Deep Squat Pose': 'xNr6yCl7fUw',
+  'Standing Leg Raise': '8Kqst-W0fpM',
+  'Squat Cooldown Flow': 'HD_c6AKOOVs',
+  'Squat Warm-Up Flow': 'Dks26WuXQ0o',
+  'Standing Knee Raise': 'qFbV50PzzNA',
+  'Supine Single Leg Raise': 'DHsdVQUBoRE',
+  'Supine Squat on Wall': '6w5mv2u-Ud8',
+  'Dip': 'IfamFQSNE9o',
+  'The Single Leg Romanian Deadlift Explained': '6gEtge69WgI',
+  'The Bicep Curl Explained': '6GMEsUonupw',
+  'Tall Kneeling Alternating Dumbbell Press': 'sHREnYZkRP0',
+  'Single Arm Kettlebell Front Rack Russian Step Up': 'nijhpzgUUi0',
+  // Map to our library exercise names
+  'Kettlebell Goblet Squat': 'BwgftZE4w0U',
+  'Romanian Deadlift': '6gEtge69WgI',
+  'Barbell Curl': '6GMEsUonupw',
+  'Dumbbell Curl': '6GMEsUonupw',
+  'EZ Bar Curl': '6GMEsUonupw',
+  'Barbell Bench Press': 'EsnM8eBtazU',
+  'Barbell Back Squat': 'OM23fjJB3-0',
+  'Deadlift': 'VOpO2BjcJSU',
+  'Overhead Press (Strict)': 'Yfp4fGhbhAI',
+  'Dumbbell Shoulder Press': 'sHREnYZkRP0',
+  'Barbell Row': 'HlMsIqQbdHc',
+  'Cable Lat Pulldown': '8fZxWTiIJWo',
+  'Cable Seated Row': 'KG0ldcebgqY',
+  'Pull-up': 'TNGl70M0tL0',
+  'Pushup': 'cP9raNfDbPI',
+  'Machine Leg Press': 'LdUmyqmg-mU',
+  'Machine Leg Extension': 'a9oPnZReIRE',
+  'Machine Leg Curl': 'ZaDlbm8E8Tg',
+  'Dumbbell Lateral Raise': 'BG75H1TqB-g',
+  'Dumbbell Bench Press': 'Fi9B3Iwqh4U',
+  'Barbell Deadlift (Conventional)': 'VOpO2BjcJSU',
+  'Barbell Lunges': 'nijhpzgUUi0',
+};
+
 const EX = _EX_RAW.map(e => ({
   id: e[0].replace(/[^a-zA-Z0-9]/g,'').toLowerCase(),
   name: e[0],
   category: e[1],
-  muscles: e[2].split(', ')
+  muscles: e[2].split(', '),
+  videoId: exerciseVideoIds[e[0]] || ''
 }));
 
 const byId = id => EX.find(e => e.id === id);

@@ -304,11 +304,14 @@ let restDuration=90;
 // ── Session state persistence (live input data) ──
 function getSessionKey(id){return `gym-session-${id}`;}
 function loadSession(id){
-  try{const d=JSON.parse(localStorage.getItem(getSessionKey(id)));return d||{};}catch(e){return {};}
+  try{const d=JSON.parse(localStorage.getItem(getSessionKey(id)));if(d&&Object.keys(d).length)return d;}catch(e){}
+  // Fallback to state.__sessionData backup (survives page restore from SW)
+  if(state.__sessionData && state.__sessionData[id]) return state.__sessionData[id];
+  return {};
 }
 function saveSession(id,data){
   localStorage.setItem(getSessionKey(id),JSON.stringify(data));
-  // Also save to state as backup for sync
+  // Also save to state as backup for sync + SW page restore
   if(!state.__sessionData)state.__sessionData={};
   state.__sessionData[id]=data;
   save(false);
@@ -1040,6 +1043,8 @@ function initLog(){
     card.querySelector('.delete-ex-btn').onclick=function(e){
       e.stopPropagation();
       if(!confirm('Remove this exercise from the workout?'))return;
+      // Save remaining session data before removing the card
+      readLog();
       const wid=getWid(); const w=state.workouts.find(x=>x.id===wid);
       if(!w)return;
       w.exercises=w.exercises.filter(x=>getExId(x)!==exId); save();
@@ -1057,7 +1062,48 @@ function initLog(){
         const from=this.dataset.supersetPair, to=this.dataset.supersetWith;
         const fromCard=document.querySelector(`.log-card[data-exercise="${from}"]`), toCard=document.querySelector(`.log-card[data-exercise="${to}"]`);
         if(fromCard&&toCard){
-          fromCard.style.borderRight='6px solid var(--orange)'; toCard.style.borderRight='6px solid var(--orange)';
+          // Save current session data before DOM change
+          readLog();
+          // Wrap both cards in a flex container to show them side by side
+          const section=$('#log-section');
+          // Remove any existing superset wrapper these cards might be in
+          [fromCard, toCard].forEach(c => {
+            const parent = c.parentElement;
+            if (parent && parent.classList.contains('superset-pair')) {
+              // Move card before the wrapper and remove wrapper
+              parent.parentElement.insertBefore(c, parent);
+              if (!parent.querySelector('.log-card')) parent.remove();
+            }
+          });
+          // Now wrap adjacent cards — need them to be siblings
+          // If they're not adjacent, insert a wrapper that contains both
+          const wrapper = document.createElement('div');
+          wrapper.className = 'superset-pair';
+          wrapper.style.cssText = 'display:flex;gap:16px;margin-bottom:16px;align-items:stretch';
+          // Find their positions in the section
+          const cards = [...section.querySelectorAll('.log-card')];
+          const fromIdx = cards.indexOf(fromCard);
+          const toIdx = cards.indexOf(toCard);
+          if (fromIdx !== -1 && toIdx !== -1) {
+            const firstIdx = Math.min(fromIdx, toIdx);
+            const secondIdx = Math.max(fromIdx, toIdx);
+            // Get the actual DOM references in order
+            const first = cards[firstIdx];
+            const second = cards[secondIdx];
+            // Insert wrapper before the first card
+            first.parentElement.insertBefore(wrapper, first);
+            // Move both cards into the wrapper
+            wrapper.appendChild(first);
+            wrapper.appendChild(second);
+            // Add title row
+            const titleRow = document.createElement('div');
+            titleRow.style.cssText = 'font:9px DM Mono,monospace;background:var(--orange);color:#fff;padding:4px 8px;margin-bottom:4px;text-align:center';
+            titleRow.textContent = '⧉ SUPERSET';
+            wrapper.insertBefore(titleRow, wrapper.firstChild);
+            // Style the cards to fit side-by-side
+            first.style.cssText = 'flex:1;min-width:0;border-right:6px solid var(--orange)';
+            second.style.cssText = 'flex:1;min-width:0;border-right:6px solid var(--orange)';
+          }
           fromCard.querySelector('.superset-group').style.display='block'; toCard.querySelector('.superset-group').style.display='block';
           const fromName=fromCard.querySelector('h2')?.textContent||'', toName=toCard.querySelector('h2')?.textContent||'';
           fromCard.querySelector('.superset-group').innerHTML=`<span style="font:9px 'DM Mono',monospace">⧉ Superset with <b>${esc(toName)}</b> <button class="remove-superset" data-exercise="${from}" style="border:0;background:none;cursor:pointer;font-size:12px;color:#c00;margin-left:4px">✕</button></span>`;
@@ -1119,13 +1165,27 @@ function initLog(){
     if(!btn)return;
     const exId=btn.dataset.exercise;
     const card=document.querySelector(`.log-card[data-exercise="${exId}"]`);
-    if(card){card.style.borderRight='';card.querySelector('.superset-group').style.display='none';}
+    if(!card)return;
+    // If card is inside a superset-pair wrapper, unwrap both cards back to normal
+    const wrapper=card.closest('.superset-pair');
+    if(wrapper){
+      const siblings=wrapper.querySelectorAll('.log-card');
+      siblings.forEach(c => {
+        c.style.cssText = '';
+        c.querySelector('.superset-group').style.display='none';
+        wrapper.parentElement.insertBefore(c, wrapper);
+      });
+      wrapper.remove();
+    } else {
+      card.style.borderRight='';
+      card.querySelector('.superset-group').style.display='none';
+    }
   });
   
-  document.querySelectorAll('[data-rest]').forEach(b=>b.onclick=function(){restDuration=+this.dataset.rest;document.querySelectorAll('[data-rest]').forEach(x=>x.classList.remove('active'));this.classList.add('active');if(restTimer){restTimer.setDuration(restDuration);restTimer.reset();updateRestUI();}});
+  document.querySelectorAll('[data-rest]').forEach(b=>b.onclick=function(){restDuration=+this.dataset.rest;document.querySelectorAll('[data-rest]').forEach(x=>x.classList.remove('active'));this.classList.add('active');if(restTimer){const wasActive=restTimer.isActive();restTimer.setDuration(restDuration);if(!wasActive)restTimer.reset();updateRestUI();}});
   
   const customRest=$('#custom-rest');
-  if(customRest)customRest.onchange=function(){const val=+this.value;if(val>0){restDuration=val;document.querySelectorAll('[data-rest]').forEach(x=>x.classList.remove('active'));if(restTimer){restTimer.setDuration(restDuration);restTimer.reset();updateRestUI();}}};
+  if(customRest)customRest.onchange=function(){const val=+this.value;if(val>0){restDuration=val;document.querySelectorAll('[data-rest]').forEach(x=>x.classList.remove('active'));if(restTimer){const wasActive=restTimer.isActive();restTimer.setDuration(restDuration);if(!wasActive)restTimer.reset();updateRestUI();}}};
   
   document.querySelectorAll('.toggle-warmup').forEach(b=>b.onclick=function(){
     const exId=this.dataset.exercise, container=$(`#warmup-${exId}`);
@@ -1156,6 +1216,7 @@ function initLog(){
     const allLogs=state.logs.filter(l=>l.sets&&l.sets[exId]), allSets=allLogs.flatMap(l=>l.sets[exId].filter(s=>!s.warmup));
     const bestVolume=allSets.reduce((a,b)=>(b.reps*b.weight)>(a.reps*a.weight)?b:a,{reps:0,weight:0});
     let html=`<div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" onclick="this.remove()"><div style="background:#fff;border:3px solid var(--ink);box-shadow:var(--shadow);padding:24px;max-width:440px;width:90%;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()"><h2 style="font-size:24px;letter-spacing:-1px;margin:0 0 4px">${esc(ex.name)}</h2><p style="font:10px 'DM Mono',monospace;color:#666;margin:0 0 16px">${ex.muscles.join(' · ')}</p>`;
+${ex.videoId?`<div style=\"margin-bottom:16px;display:flex;gap:8px\"><a href=\"https://www.youtube.com/watch?v=${ex.videoId}\" target=\"_blank\" style=\"flex:1;display:flex;align-items:center;gap:6px;background:#fff;border:2px solid var(--ink);box-shadow:var(--shadow);padding:10px 12px;text-decoration:none;font-weight:700;font-size:13px\">▶ Watch OPEX demo</a></div>`:''}
     if(bestVolume.reps>0)html+=`<div style="background:var(--sun);border:2px solid var(--ink);padding:12px;margin-bottom:16px"><b style="font-size:14px">🏆 Personal Record</b><br><span style="font-size:18px;font-weight:800">${bestVolume.reps} reps × ${bestVolume.weight} kg</span></div>`;
     if(allLogs.length>0){allLogs.slice().reverse().slice(0,10).forEach(l=>{const sets=l.sets[exId].filter(s=>!s.warmup);if(!sets.length)return;html+=`<div style="margin-bottom:10px;padding:8px;background:#f9f9f9;border:1px solid #eee"><b style="font:9px 'DM Mono',monospace">${l.date}</b><div style="margin-top:4px">${sets.map(s=>`<span style="display:inline-block;background:var(--sun);padding:2px 6px;margin:2px;border:1px solid var(--ink);font:9px 'DM Mono',monospace">${s.reps}×${s.weight} kg</span>`).join('')}</div></div>`;});}
     html+=`<button style="margin-top:8px;border:2px solid var(--ink);background:var(--paper);padding:8px 16px;font-weight:700;cursor:pointer" onclick="this.closest('div[style]').parentElement.remove()">Close</button></div></div>`;
@@ -1200,6 +1261,24 @@ function initLog(){
   
   updateTotals();
   document.querySelectorAll('.log-card').forEach(c=>markCompletedCard(c));
+
+  // ── Auto-save session when page is hidden (phone lock, tab switch, etc.) ──
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      const wid = getWid();
+      if (wid) {
+        const data = {};
+        document.querySelectorAll('.log-card').forEach(c => {
+          const exId = c.dataset.exercise;
+          const sets = [...c.querySelectorAll('.set-row:not(.warmup)')]
+            .map(x => ({ reps: +x.querySelector('.reps').value||0, weight: +x.querySelector('.weight').value||0, rir: x.querySelector('.rir') ? +x.querySelector('.rir').value||0 : 0 }))
+            .filter(x => x.reps);
+          data[exId] = sets;
+        });
+        if (Object.keys(data).length) saveSession(wid, data);
+      }
+    }
+  });
 }
 
 function initSocial(){
